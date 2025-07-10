@@ -8,14 +8,11 @@ class FastScalperStrategy(bt.Strategy):
     """
     """
     params = (
-        ('initial_buy_amount_factor', 0.01),  # Factor of available cash for initial buy
-        ('martingale_multiplier', 2.0),      # Multiplier for subsequent Fibo buy quantities
         ('initial_tp_percent', 0.05),        # Initial Take Profit percentage from average buy price
         ('global_sl_percent', 0.990),         # Global Stop Loss percentage from average buy price
         ('green_candle_streak_required', 2),  # Number of consecutive green candles required for Fibo buy
         ('data_in_market_cap', False),  # Number of consecutive green candles required for Fibo buy
         ('martingale_loss_trigger', -0.10),  # New parameter for -10% loss trigger
-
         ('log', True)
     )
 
@@ -69,41 +66,27 @@ class FastScalperStrategy(bt.Strategy):
         """
         when using marketcap, the cash was multiplied by 1B for math reasons, so when logging divid it by 1B
         """
-        if self.p.data_in_market_cap:
-            return value / 1_000_000_000
-        else:
-            return value
+        return value / 1_000_000_000 if self.p.data_in_market_cap else value
 
     def log(self, txt, dt=None):
         ''' Logging function for this strategy to print messages with date'''
         dt = dt or self.datas[0].datetime.date(0)
         if self.params.log:
-            print(f'{self.index} {dt.isoformat()}, {txt}')
+            print(f'Index {self.index} {dt.isoformat()}, {txt}')
 
     def catch_migration(self, current_price):
-        if self.p.data_in_market_cap:
-            if current_price > self.migration_market_cap:
-                self.migrated = True
-        else:
-            if current_price * 1_000_000_000 > self.migration_market_cap:
-                self.migrated = True
-
-        # If not migrated and price is still below threshold, do nothing
-        # This check prevents unnecessary updates if migration hasn't happened yet
-        if not self.migrated and (self.p.data_in_market_cap and current_price < self.migration_market_cap or
-                                  not self.p.data_in_market_cap and current_price * 1_000_000_000 < self.migration_market_cap):
+        if self.migrated:
             return
+        tmp = current_price if self.p.data_in_market_cap else current_price * 1_000_000_000
+        if tmp > self.migration_market_cap:
+            self.migrated = True
 
     def catch_dead_coin(self, current_price):
         if self.migrated:
-            if self.p.data_in_market_cap:
-                if current_price < self.dead_coin_market_cap:
-                    self.log(f"Announcing coin death at {current_price}")
-                    self.dead_coin = True
-            else:
-                if current_price * 1_000_000_000 < self.dead_coin_market_cap:
-                    self.log(f"Announcing coin death at {current_price}")
-                    self.dead_coin = True
+            tmp = current_price if self.p.data_in_market_cap else current_price * 1_000_000_000
+            if tmp < self.dead_coin_market_cap:
+                self.log(f"Announcing coin death at {current_price}")
+                self.dead_coin = True
 
     def green_candle_ok(self):
         return self.green_candle_streak >= self.p.green_candle_streak_required
@@ -115,14 +98,12 @@ class FastScalperStrategy(bt.Strategy):
             self.green_candle_streak = 0
 
     def update_ath(self):
-        # Update ATH (All-Time High) since the last portfolio reset
-        # This ATH is crucial for calculating Fibonacci retracement levels for new buys.
         # update on each 5%
         if self.ath == 0.0 or self.ath * self.ath_update_thrshld < self.dataclose[0]:
             self.ath = max(self.ath, self.datahigh[0])
 
-    #  utils end ##########################
-    #  notifies ##########################
+    # --------------------------------- utils end ---------------------------------
+    # --------------------------------- notify ---------------------------------
 
     def notify_order(self, order):
         """
@@ -171,9 +152,8 @@ class FastScalperStrategy(bt.Strategy):
             self.log(f"Change in cash value cash:{self.cash_when_mcap(cash)} ,value:{self.cash_when_mcap(value)}")
             self.old_cash = cash
             self.old_value = value
-
-    #  notifies end ##########################
-    #  functions ##########################
+    # --------------------------------- notifies end ---------------------------------
+    # --------------------------------- functions ---------------------------------
 
     def _update_portfolio_stats(self):
         """
@@ -265,7 +245,6 @@ class FastScalperStrategy(bt.Strategy):
 
         # Check if we are in a position
         current_position_size = self.getposition(self.datas[0]).size
-        # self.sizer.p.buy_type_next = 'initial_buy'
 
         # --- Calculate current PnL percentage (required for -10% loss trigger) ---
         pnl_percent = 0.0
@@ -273,35 +252,18 @@ class FastScalperStrategy(bt.Strategy):
             # Calculate PnL percentage based on average buy price and current price
             # Note: Backtrader's position object's .price is the average entry price.
             pnl_percent = (current_price / self.portfolio_avg_buy_price) - 1.0
-            # self.sizer.p.buy_type_next = 'fibo_martingale_buy'
-        # else:
-        #     self.sizer.p.buy_type_next = 'initial_buy'
-
-        # --- Buy Condition: RSI < 40 ---
-        # (Only if not already in a position OR if we are in a position and triggering Martingale)
-
-        # --- Martingale/Averaging Down Condition: PnL < -10% ---
-        martingale_condition = (current_position_size > 0 and
-                                pnl_percent <= self.p.martingale_loss_trigger)  # Check if loss is -10% or more
 
         # --- Execution Logic ---
-
         # Scenario 1: Initial Buy (No open position, RSI < 40)
         if current_position_size == 0 and self.rsi[0] < 40:
-
             if self.broker.getcash() > 0:
                 self.log(f'INITIAL BUY (RSI < 40): Attempting to buy at {current_price}')
-                # Note: You need a sizer implemented to define the buy size.
-                self.buy()
+                self.buy()  # Sizer defines the buy size.
                 # After the buy, _update_portfolio_stats and has_done_initial_buy flags will be set via notify_order.
 
         # Scenario 2: Martingale Buy (Open position, PnL < -10%, RSI < 40)
-        # Note: The original request implied buying another position if -10% regardless of RSI,
-        # but a typical scalping/Martingale strategy often waits for a favorable indicator before adding.
         # We will add if PnL is -10% or lower and RSI < 40 (optional, but safer).
-        elif current_position_size > 0 and martingale_condition and self.rsi[0] < 40:
+        elif current_position_size > 0 and pnl_percent <= self.p.martingale_loss_trigger and self.rsi[0] < 40:
             if self.broker.getcash() > 0:
                 self.log(f'MARTINGALE BUY (PnL {pnl_percent*100:.2f}%): Adding position at {current_price}')
-                # You would calculate the new buy size here (e.g., using martingale_multiplier)
-                # and execute the buy.
                 self.buy()

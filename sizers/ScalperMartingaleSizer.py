@@ -82,11 +82,11 @@ class ScalperMartingaleSizer(bt.Sizer):
             size = math.floor(cash_for_buy / current_price)
 
             if size > 0:
-                # Calculate the quantity/cash for the *first* Martingale step
+                # Calculate the quantity/cash for the Next Martingale step
                 self.current_martingale_quantity = size * self.params.martingale_multiplier
                 self.current_martingale_cash = cash_for_buy * self.params.martingale_multiplier
 
-                # Mark that the initial buy has been processed (important state update)
+                # Mark that the initial buy has been processed
                 self.has_done_initial_buy_sizer = True
 
                 self.log(f'Sizer: Initial Buy Size Calculated: {size}, Next Martingale Qty: {self.current_martingale_quantity:.2f}, Next Martingale Cash: {self.current_martingale_cash:.4f}')
@@ -97,17 +97,10 @@ class ScalperMartingaleSizer(bt.Sizer):
 
         # If we *have* done the initial buy, any subsequent buy is a Martingale buy.
         else:
-
-            # --- Martingale Buy Sizing (Fibonacci/Loss-based) ---
-            # Use the calculated quantity/cash from the previous buy step
-
-            size_to_buy = math.floor(self.current_martingale_quantity)
-            cost_of_buy = self.current_martingale_cash
-
-            # Calculate the actual size based on current price and required cash/size
-            # Note: The original code used 'size = math.floor(cost_of_buy / current_price)'
             # We should use size_to_buy if we are tracking quantity, or calculate from cash if tracking cash.
-            # If size_to_buy is calculated correctly from the previous step, we use that.
+            # size_to_buy = math.floor(self.current_martingale_quantity)
+            cost_of_buy = self.current_martingale_cash
+            size_to_buy = math.floor(cost_of_buy / current_price)
 
             if size_to_buy > 0 and cash >= cost_of_buy:
                 # Update the quantity/cash for the *next* martingale step *before* returning the current size.
