@@ -168,11 +168,13 @@ def run_backtest_for_df(df, coin_name,
 def run_all(csv_files,
             sizer_class=FiboMartingaleSizer,
             strategy_class=FiboMartingaleStrategy,
-            cash=1000,
+            cash=1,
             commission=0.001,
             sizer_params=None,
             strategy_params=None,
             mcap=False,
+            df_start_margin=0,
+            df_end_margin=-1
             ):
     """
     Runs backtests for multiple coin dataframes and aggregates results.
@@ -196,7 +198,7 @@ def run_all(csv_files,
 
         try:
             analysis_result, cerebro_obj, portfolio_history_series = run_backtest_for_df(
-                df,
+                df[df_start_margin:df_end_margin],
                 coin_name=coin_name,
                 strategy_class=strategy_class,
                 cash=cash,
