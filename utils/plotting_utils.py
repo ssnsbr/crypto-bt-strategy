@@ -29,7 +29,7 @@ def plot_single_backtest(cerebro_obj, title="Backtest Plot"):
 
 
 # --- Plotting Aggregated Portfolio Histories ---
-def plot_all_portfolio_histories_by_time(all_portfolio_histories, title="Portfolio Value Over Time for All Coins"):
+def plot_all_portfolio_histories_by_time(all_portfolio_histories, title="Portfolio Value Over Time for All Coins", legend=True):
     """
     Plots the portfolio history for all backtests on a single chart.
 
@@ -49,14 +49,15 @@ def plot_all_portfolio_histories_by_time(all_portfolio_histories, title="Portfol
     plt.title(title)
     plt.xlabel("Date")
     plt.ylabel("Portfolio Value")
-    plt.legend(loc='upper left', bbox_to_anchor=(1.01, 1.0), fontsize='small')
+    if legend:
+        plt.legend(loc='upper left', bbox_to_anchor=(1.01, 1.0), fontsize='small')
     plt.grid(True)
     plt.tight_layout()  # Adjusts plot to prevent labels from overlapping
     plt.show()
 
 
 # --- Plotting Aggregated Portfolio Histories ---
-def plot_all_portfolio_histories(all_portfolio_histories, title="Portfolio Value Over Time for All Coins"):
+def plot_all_portfolio_histories(all_portfolio_histories, title="Portfolio Value Over Time for All Coins", legend=True):
     """
     Plots the portfolio history for all backtests on a single chart.
 
@@ -79,7 +80,8 @@ def plot_all_portfolio_histories(all_portfolio_histories, title="Portfolio Value
     plt.title(title)
     plt.xlabel("Trade Number")
     plt.ylabel("Portfolio Value")
-    plt.legend(loc='upper left', bbox_to_anchor=(1.01, 1.0), fontsize='small')
+    if legend:
+        plt.legend(loc='upper left', bbox_to_anchor=(1.01, 1.0), fontsize='small')
     plt.grid(True)
     plt.tight_layout()  # Adjusts plot to prevent labels from overlapping
     plt.show()

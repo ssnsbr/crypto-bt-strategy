@@ -33,6 +33,7 @@ class ScalperMartingaleSizer(bt.Sizer):
             print(f"[Sizer] [{self.__class__.__name__}]", text)
 
     def __init__(self):
+        self.current_martingale_cash = 0.0
         self.has_done_initial_buy_sizer = False
         self.current_martingale_quantity = 0.0  # This will hold the quantity for the *next* martingale step
         self.log(" Log On, FiboMartingaleSizer as sizer.")
@@ -57,8 +58,14 @@ class ScalperMartingaleSizer(bt.Sizer):
         self.log(" state reset.")
 
     def update(self):  # Update for next step
-        self.current_martingale_quantity *= self.p.martingale_multiplier
-        self.current_martingale_cash *= self.params.martingale_multiplier
+        if self.current_martingale_quantity > 0:
+            self.current_martingale_quantity *= self.p.martingale_multiplier
+        else:
+            self.log(" current_martingale_quantity is 0")
+        if self.current_martingale_cash > 0:
+            self.current_martingale_cash *= self.params.martingale_multiplier
+        else:
+            self.log(" current_martingale_cash is 0")
 
     # --- Main Sizing Logic ---
 

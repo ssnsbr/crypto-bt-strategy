@@ -13,7 +13,9 @@ class FastScalperStrategy(bt.Strategy):
         ('green_candle_streak_required', 2),  # Number of consecutive green candles required for Fibo buy
         ('data_in_market_cap', False),  # Number of consecutive green candles required for Fibo buy
         ('martingale_loss_trigger', -0.10),  # New parameter for -10% loss trigger
-        ('log', True)
+        ('log', True),
+        ('rsi_buy_threshold', 40),
+
     )
 
     def __init__(self):
@@ -61,6 +63,7 @@ class FastScalperStrategy(bt.Strategy):
         self.old_cash = 0
         # Instantiate the RiskManagement class
         self.risk_manager = ScalperRiskManagement(self)
+        self.old_value = 0
 
     # --------------------------------- utils ---------------------------------
     def cash_when_mcap(self, value):
@@ -259,11 +262,13 @@ class FastScalperStrategy(bt.Strategy):
 
         # --- Execution Logic ---
         # Scenario 1: Initial Buy (No open position, RSI < 40)
-        if current_position_size == 0 and self.rsi[0] < 40:
+        if current_position_size == 0 and self.rsi[0] < self.p.rsi_buy_threshold:
             if self.broker.getcash() > 0:
                 self.log(f'INITIAL BUY (RSI < 40): Attempting to buy at {self._format_value_for_log_mcap(current_price)} price.')
                 self.buy()  # Sizer defines the buy size.
                 # After the buy, _update_portfolio_stats and has_done_initial_buy flags will be set via notify_order.
+            else:
+                self.log("Martingale Buy Skipped: Not enough cash.")
 
         # Scenario 2: Martingale Buy (Open position, PnL < -10%, RSI < 40)
         # We will add if PnL is -10% or lower and RSI < 40 (optional, but safer).
