@@ -55,19 +55,19 @@ if __name__ == "__main__":
                                                                             strategy_params=strategy_params,
                                                                             sizer_params=sizer_params,
                                                                             cash=1000,
-                                                                            commission=0.1,
                                                                             mcap=mcap,
                                                                             )
+    print("All Runs Complete!")
 
     # if __name__ == '__main__':
     # Step 1: Run all backtests
-    # all_results_df, all_cerebros_objects, all_portfolio_histories = run_all(csv_files[:10], FiboMartingaleStrategy, 10, 0.1, mcap=True, log=True, sizer_log=True)
+    # all_results_df, all_cerebros_objects, all_portfolio_histories = run_all(csv_files[:2], FiboMartingaleStrategy, 10, 0.1, mcap=True)
 
     # Step 2: Display the aggregated results DataFrame
     g = all_results_df[all_results_df["start_value"] < all_results_df["final_value"]]
     print(f"{len(g)} of {len(all_results_df)} were profitable!")
     # print(g)
-    
+
     print("\n--- Aggregated Backtest Results ---")
 
     all_results_df

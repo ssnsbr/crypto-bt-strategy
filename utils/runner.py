@@ -3,6 +3,7 @@ import numpy as np
 import os
 
 import backtrader as bt
+from commission.CustomSolanaCommission import CustomSolanaCommission
 from sizers.FiboMartingaleSizer import FiboMartingaleSizer
 from strategies import FiboMartingaleStrategy
 from utils.data_utils import ready_df
@@ -29,13 +30,14 @@ class CashHistoryAnalyzer(bt.Analyzer):
 
 
 def run_backtest_for_df(df, coin_name,
-                        sizer_class=FiboMartingaleSizer,
-                        strategy_class=FiboMartingaleStrategy,
+                        sizer_class=None,
+                        strategy_class=None,
+                        commission_class=None,
                         cash=1000,
-                        commission=0.001,
                         strategy_params=None,
                         sizer_params=None,
-                        mcap=False
+                        mcap=False,
+                        print_cash_history=False
                         ):
     """
     Runs a backtest for a single DataFrame and returns results and the cerebro object.
@@ -55,8 +57,8 @@ def run_backtest_for_df(df, coin_name,
     cerebro = bt.Cerebro()
 
     # Pass the strategy_params dictionary using **kwargs
+    print("[RUN] ", "Strategy:", strategy_class.__name__, ",strategy_class.params:", strategy_params)
     cerebro.addstrategy(strategy_class, **strategy_params)
-    print("strategy_class.params:", strategy_params)
 
     data = bt.feeds.PandasData(
         dataname=df,
@@ -74,16 +76,22 @@ def run_backtest_for_df(df, coin_name,
     # REGISTER YOUR SIZER
     # cerebro.addsizer(DynamicTrendHybridSizer,stake=0.1)
     # cerebro.addsizer(bt.sizers.FixedSize, stake=10) # Example of adding a sizer
-    print("sizer_params.params:", sizer_params)
+    print("[RUN] ", "Sizer:", sizer_class.__name__, ",sizer_params.params:", sizer_params)
     cerebro.addsizer(sizer_class, **sizer_params)
 
     if mcap:
         cerebro.broker.setcash(cash * 1_000_000_000)
+        print("[RUN] in mcap", mcap, "Cash:", cash, " In App Cash:", cash * 1_000_000_000)
     else:
         cerebro.broker.setcash(cash)
-    cerebro.broker.setcommission(commission)
+        print("[RUN] in mcap", mcap, "Cash:", cash, " In App Cash:", cash)
+
+    # REGISTER YOUR COMMISSION
+    print("[RUN] ", "Commission:", commission_class.__name__)
+    cerebro.broker.addcommissioninfo(commission_class())
 
     # Add analyzers
+    print("[RUN] ", "Adding Analyzers and Observers.")
     cerebro.addanalyzer(bt.analyzers.SharpeRatio, _name='mysharpe')
     cerebro.addanalyzer(bt.analyzers.DrawDown, _name='mydrawdown')
     cerebro.addanalyzer(bt.analyzers.TradeAnalyzer, _name='mytradeanalyzer')
@@ -96,18 +104,17 @@ def run_backtest_for_df(df, coin_name,
     cerebro.addobserver(bt.observers.BuySell)
     cerebro.addobserver(bt.observers.Trades)
     if mcap:
-        print(f'Starting backtest for {coin_name} - Initial Portfolio Value: {cerebro.broker.getvalue()/1_000_000_000:.2f}')
+        print(f'[RUN] Starting backtest for {coin_name} - Initial Portfolio Value: {cerebro.broker.getvalue()/1_000_000_000:.2f}')
     else:
-        print(f'Starting backtest for {coin_name} - Initial Portfolio Value: {cerebro.broker.getvalue():.2f}')
-
+        print(f'[RUN] Starting backtest for {coin_name} - Initial Portfolio Value: {cerebro.broker.getvalue():.2f}')
     results = cerebro.run()
     strategy = results[0]
-
+    print("[RUN] ", "Cerebro Ended.")
     final_portfolio_value = cerebro.broker.getvalue()
 
     if mcap:
         final_portfolio_value = final_portfolio_value / 1_000_000_000
-    print(f'Final Portfolio Value for {coin_name}: {final_portfolio_value:.2f}')
+    print(f'[RUN] Final Portfolio Value for {coin_name}: {final_portfolio_value:.2f}')
 
     # Extract analysis results
     analysis_results = {
@@ -123,7 +130,7 @@ def run_backtest_for_df(df, coin_name,
     }
     print('Analyze:')
     for k, v in analysis_results.items():
-        print(k, v)
+        print("[RUN] ", k, v)
     # Extract portfolio history for plotting
     # The PositionsValue analyzer can give us the portfolio value over time.
     # We need to iterate through the cerebro's data to get the dates
@@ -155,12 +162,12 @@ def run_backtest_for_df(df, coin_name,
 
     if mcap:
         cash_history_series = cash_history_series / 1_000_000_000
-
-    print("Cash History:", cash_history_series.tolist())
+    if print_cash_history:
+        print("[RUN] Cash History:", cash_history_series.tolist())
 
     combined_array = np.column_stack((cash_history_series.values, portfolio_history_series.values))
     result_list_of_lists = combined_array.tolist()
-    print("Full History:", result_list_of_lists)
+    print("[RUN] Full History:", result_list_of_lists)
 
     return analysis_results, cerebro, cash_history_series
 
@@ -169,7 +176,6 @@ def run_all(csv_files,
             sizer_class=FiboMartingaleSizer,
             strategy_class=FiboMartingaleStrategy,
             cash=1,
-            commission=0.001,
             sizer_params=None,
             strategy_params=None,
             mcap=False,
@@ -202,10 +208,10 @@ def run_all(csv_files,
                 coin_name=coin_name,
                 strategy_class=strategy_class,
                 cash=cash,
-                commission=commission,
                 sizer_class=sizer_class,
                 strategy_params=strategy_params,
                 mcap=mcap,
+                commission_class=CustomSolanaCommission,
                 sizer_params=sizer_params)
             all_results.append(analysis_result)
             all_cerebros[coin_name] = cerebro_obj

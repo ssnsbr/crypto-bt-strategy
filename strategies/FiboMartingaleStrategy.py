@@ -28,10 +28,10 @@ class FiboMartingaleStrategy(bt.Strategy):
     def __init__(self):
         if self.p.data_in_market_cap:
             self._format_value_for_log_mcap = format_marketcap
-            print("Price IS in Market Cap!")
+            self.log("Price IS in Market Cap!")
         else:
             self._format_value_for_log_mcap = format_price_to_marketcap
-            print("Price is NOT in Market Cap!")
+            self.log("Price is NOT in Market Cap!")
 
         # Data feeds (assuming only one data feed)
         self.dataclose = self.datas[0].close
@@ -141,14 +141,14 @@ class FiboMartingaleStrategy(bt.Strategy):
 
         if order.status in [order.Completed]:
             if order.isbuy():
-                self.log(f'BUY EXECUTED, Price: {self._format_value_for_log_mcap(order.executed.price)}, Cost: {self.cash_when_mcap(order.executed.value)}, Comm: {self.cash_when_mcap(order.executed.comm)}, Size: {order.executed.size:.2f}')
+                self.log(f'BUY EXECUTED, Price: {self._format_value_for_log_mcap(order.executed.price)}, Cost: {self.cash_when_mcap(order.executed.value):.6f}, Comm: {self.cash_when_mcap(order.executed.comm):.6f}, Size: {order.executed.size:.2f}')
                 # If this is the very first buy of a cycle, set the base quantity for subsequent martingale buys
                 if not self.has_done_initial_buy:
                     self.has_done_initial_buy = True
                     # using sizer to adjust size of buy and sell
 
             elif order.issell():
-                self.log(f'SELL EXECUTED, Price: {self._format_value_for_log_mcap(order.executed.price)}, Cost: {self.cash_when_mcap(order.executed.value )}, Comm: {self.cash_when_mcap(order.executed.comm)}, Size: {order.executed.size:.2f}')
+                self.log(f'SELL EXECUTED, Price: {self._format_value_for_log_mcap(order.executed.price)}, Cost: {self.cash_when_mcap(order.executed.value ):.6f}, Comm: {self.cash_when_mcap(order.executed.comm):.6f}, Size: {order.executed.size:.2f}')
                 # If all positions are closed after a sell (either TP or SL), reset the strategy state
                 if not self.getposition(self.datas[0]):  # Check if position size is zero
                     self.log("All positions closed. Resetting strategy state.")
@@ -166,14 +166,17 @@ class FiboMartingaleStrategy(bt.Strategy):
         Handles notifications about trade closures (when a buy and sell fully offset).
         """
         if trade.isclosed:
-            self.log(f'TRADE PNL, Gross {trade.pnl:.2f}, Net {trade.pnlcomm:.2f}')
+            if self.p.data_in_market_cap:
+                self.log(f'TRADE PNL, Gross {trade.pnl/1_000_000_000:.6f}, Net {trade.pnlcomm/1_000_000_000:.6f}')
+            else:
+                self.log(f'TRADE PNL, Gross {trade.pnl:.2f}, Net {trade.pnlcomm:.2f}')
 
     def notify_cashvalue(self, cash, value):
         """
         Receives the current fund value, value status of the strategy’s broker
         """
         if cash != self.old_cash:
-            self.log(f"Change in cash value cash:{self.cash_when_mcap(cash)} ,value:{self.cash_when_mcap(value)}")
+            self.log(f"Change in cash/value cash:{self.cash_when_mcap(cash):.6f} ,value:{self.cash_when_mcap(value):.6f}")
             self.old_cash = cash
             self.old_value = value
 

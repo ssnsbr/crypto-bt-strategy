@@ -31,7 +31,7 @@ class FiboMartingaleSizer(bt.Sizer):
 
     def log(self, text):
         if self.params.log:
-            print(text)
+            print("[Sizer]", self.__class__.__name__, text)
 
     def __init__(self):
         self.has_done_initial_buy_sizer = False
@@ -39,14 +39,14 @@ class FiboMartingaleSizer(bt.Sizer):
         self.log("Log On, FiboMartingaleSizer as sizer.")
         if self.params.data_in_market_cap:
             self._format_value_for_log_mcap = format_marketcap
-            self.log("Sizer Price IS in Market Cap!")
+            self.log("Price IS in Market Cap!")
         else:
             self._format_value_for_log_mcap = format_price_to_marketcap
-            self.log("Sizer Price is NOT in Market Cap!")
+            self.log("Price is NOT in Market Cap!")
 
     def get_cash(self, cash=1):
         if self.params.type_fixed:
-            self.log("Sizer using fixed amount for buy!")
+            self.log("using fixed amount for buy!")
             return self.params.initial_buy_amount_fix
         return cash * self.params.initial_buy_amount_factor
 
@@ -55,7 +55,7 @@ class FiboMartingaleSizer(bt.Sizer):
         self.has_done_initial_buy_sizer = False
         self.current_martingale_quantity = 0.0
         self.params.buy_type_next = None  # Reset the signal
-        self.log("Sizer state reset.")
+        self.log("state reset.")
 
     def update(self):  # Update for next step
         self.current_martingale_quantity *= self.p.martingale_multiplier
@@ -83,14 +83,14 @@ class FiboMartingaleSizer(bt.Sizer):
                     self.current_martingale_quantity = size * self.params.martingale_multiplier
                     self.current_martingale_cash = cash_for_buy * self.params.martingale_multiplier
                     self.has_done_initial_buy_sizer = True
-                    self.log(f'Sizer: Initial Buy Size Calculated: {size}, Next Martingale Qty: {self.current_martingale_quantity:.2f}, cash {self.current_martingale_cash:.4f}')
+                    self.log(f'Initial Buy Size Calculated: {size}, Next Martingale Qty: {self.current_martingale_quantity:.2f}, cash {self.current_martingale_cash:.4f}')
                     return size
                 else:
-                    self.log(f'Sizer: Initial BUY: Not enough cash ({self.cash_when_mcap(cash)}) for meaningful buy at {self._format_value_for_log_mcap(current_price)}')
+                    self.log(f'Initial BUY: Not enough cash ({self.cash_when_mcap(cash)}) for meaningful buy at {self._format_value_for_log_mcap(current_price)}')
                     return 0
             else:
                 # This should ideally not happen if strategy logic is correct
-                self.log("Sizer: Warning Attempted initial_buy but already done initial buy. Returning 0.")
+                self.log("Warning Attempted initial_buy but already done initial buy. Returning 0.")
                 return 0
 
         # --- Fibonacci Martingale Buy Sizing ---
@@ -103,16 +103,16 @@ class FiboMartingaleSizer(bt.Sizer):
 
                 if size_to_buy > 0 and cash >= cost_of_buy:
                     self.update()
-                    self.log(f'Sizer: Fibo Buy Size Calculated: {size_to_buy}, Next Martingale Qty: {self.current_martingale_quantity:.2f}')
+                    self.log(f'Fibo Buy Size Calculated: {size_to_buy}, Next Martingale Qty: {self.current_martingale_quantity:.2f}')
                     return size_to_buy
                 else:
-                    self.log(f'Sizer: Fibo Buy: Insufficient cash  {self.cash_when_mcap(cash)} for {size_to_buy} units at {self._format_value_for_log_mcap(current_price)} or quantity is zero.')
+                    self.log(f'Fibo Buy: Insufficient cash  {self.cash_when_mcap(cash)} for {size_to_buy} units at {self._format_value_for_log_mcap(current_price)} or quantity is zero.')
                     return 0
             else:
-                self.log("Sizer: Attempted fibo_martingale_buy before initial buy. Returning 0.")
+                self.log("Attempted fibo_martingale_buy before initial buy. Returning 0.")
                 return 0
         else:
             # This handles cases where _getsizing is called for an unexpected buy type
             # (e.g., if strategy tries self.buy() without setting buy_type_next)
-            self.log(f"Sizer: Warning Unknown buy_type_next: {buy_type}. Returning 0.")
+            self.log(f"Warning Unknown buy_type_next: {buy_type}. Returning 0.")
             return 0

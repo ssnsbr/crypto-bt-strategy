@@ -30,22 +30,22 @@ class ScalperMartingaleSizer(bt.Sizer):
 
     def log(self, text):
         if self.params.log:
-            print(text)
+            print(f"[Sizer] [{self.__class__.__name__}]", text)
 
     def __init__(self):
         self.has_done_initial_buy_sizer = False
         self.current_martingale_quantity = 0.0  # This will hold the quantity for the *next* martingale step
-        self.log("Log On, FiboMartingaleSizer as sizer.")
+        self.log(" Log On, FiboMartingaleSizer as sizer.")
         if self.params.data_in_market_cap:
             self._format_value_for_log_mcap = format_marketcap
-            self.log("Sizer Price IS in Market Cap!")
+            self.log("Price IS in Market Cap!")
         else:
             self._format_value_for_log_mcap = format_price_to_marketcap
-            self.log("Sizer Price is NOT in Market Cap!")
+            self.log(" Price is NOT in Market Cap!")
 
     def get_cash(self, cash=1):
         if self.params.type_fixed:
-            self.log("Sizer using fixed amount for buy!")
+            self.log(" using fixed amount for buy!")
             return self.params.initial_buy_amount_fix
         return cash * self.params.initial_buy_amount_factor
 
@@ -54,7 +54,7 @@ class ScalperMartingaleSizer(bt.Sizer):
         self.has_done_initial_buy_sizer = False
         self.current_martingale_quantity = 0.0
         self.params.buy_type_next = None  # Reset the signal
-        self.log("Sizer state reset.")
+        self.log(" state reset.")
 
     def update(self):  # Update for next step
         self.current_martingale_quantity *= self.p.martingale_multiplier
@@ -89,10 +89,10 @@ class ScalperMartingaleSizer(bt.Sizer):
                 # Mark that the initial buy has been processed
                 self.has_done_initial_buy_sizer = True
 
-                self.log(f'Sizer: Initial Buy Size Calculated: {size}, Next Martingale Qty: {self.current_martingale_quantity:.2f}, Next Martingale Cash: {self.current_martingale_cash:.4f}')
+                self.log(f': Initial Buy Size Calculated: {size}, Next Martingale Qty: {self.current_martingale_quantity:.2f}, Next Martingale Cash: {self.current_martingale_cash:.4f}')
                 return size
             else:
-                self.log(f'Sizer: Initial BUY: Not enough cash ({self.cash_when_mcap(cash)}) for meaningful buy at {self._format_value_for_log_mcap(current_price)}')
+                self.log(f': Initial BUY: Not enough cash ({self.cash_when_mcap(cash)}) for meaningful buy at {self._format_value_for_log_mcap(current_price)}')
                 return 0
 
         # If we *have* done the initial buy, any subsequent buy is a Martingale buy.
@@ -106,8 +106,8 @@ class ScalperMartingaleSizer(bt.Sizer):
                 # Update the quantity/cash for the *next* martingale step *before* returning the current size.
                 self.update()
 
-                self.log(f'Sizer: Martingale Buy Size Calculated: {size_to_buy}, Next Martingale Qty: {self.current_martingale_quantity:.2f}')
+                self.log(f': Martingale Buy Size Calculated: {size_to_buy}, Next Martingale Qty: {self.current_martingale_quantity:.2f}')
                 return size_to_buy
             else:
-                self.log(f'Sizer: Martingale Buy: Insufficient cash {self.cash_when_mcap(cash)} for {size_to_buy} units at {self._format_value_for_log_mcap(current_price)} or quantity is zero.')
+                self.log(f': Martingale Buy: Insufficient cash {self.cash_when_mcap(cash)} for {size_to_buy} units at {self._format_value_for_log_mcap(current_price)} or quantity is zero.')
                 return 0

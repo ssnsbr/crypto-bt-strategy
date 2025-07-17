@@ -17,12 +17,14 @@ class FastScalperStrategy(bt.Strategy):
     )
 
     def __init__(self):
+        self.index = 0
+
         if self.p.data_in_market_cap:
             self._format_value_for_log_mcap = format_marketcap
-            print("Price IS in Market Cap!")
+            self.log("Price IS in Market Cap!")
         else:
             self._format_value_for_log_mcap = format_price_to_marketcap
-            print("Price is NOT in Market Cap!")
+            self.log("Price is NOT in Market Cap!")
         self.rsi = bt.indicators.RSI(self.datas[0].close, period=14)  # Common RSI period
 
         # Data feeds (assuming only one data feed)
@@ -59,7 +61,6 @@ class FastScalperStrategy(bt.Strategy):
         self.old_cash = 0
         # Instantiate the RiskManagement class
         self.risk_manager = ScalperRiskManagement(self)
-        self.index = 0
 
     # --------------------------------- utils ---------------------------------
     def cash_when_mcap(self, value):
@@ -72,7 +73,7 @@ class FastScalperStrategy(bt.Strategy):
         ''' Logging function for this strategy to print messages with date'''
         dt = dt or self.datas[0].datetime.date(0)
         if self.params.log:
-            print(f'Index {self.index} {dt.isoformat()}, {txt}')
+            print(f'[Strategy] [{self.__class__.__name__}] Index {self.index} {dt.isoformat()}, {txt}')
 
     def catch_migration(self, current_price):
         if self.migrated:
@@ -117,14 +118,14 @@ class FastScalperStrategy(bt.Strategy):
 
         if order.status in [order.Completed]:
             if order.isbuy():
-                self.log(f'BUY EXECUTED, Price: {self._format_value_for_log_mcap(order.executed.price)}, Cost: {self.cash_when_mcap(order.executed.value)}, Comm: {self.cash_when_mcap(order.executed.comm)}, Size: {order.executed.size:.2f}')
+                self.log(f'BUY EXECUTED, Price: {self._format_value_for_log_mcap(order.executed.price)}, Cost: {self.cash_when_mcap(order.executed.value):.6f}, Comm: {self.cash_when_mcap(order.executed.comm):.6f}, Size: {order.executed.size:.2f}')
                 # If this is the very first buy of a cycle, set the base quantity for subsequent martingale buys
                 if not self.has_done_initial_buy:
                     self.has_done_initial_buy = True
                     # using sizer to adjust size of buy and sell
 
             elif order.issell():
-                self.log(f'SELL EXECUTED, Price: {self._format_value_for_log_mcap(order.executed.price)}, Cost: {self.cash_when_mcap(order.executed.value )}, Comm: {self.cash_when_mcap(order.executed.comm)}, Size: {order.executed.size:.2f}')
+                self.log(f'SELL EXECUTED, Price: {self._format_value_for_log_mcap(order.executed.price)}, Cost: {self.cash_when_mcap(order.executed.value ):.6f}, Comm: {self.cash_when_mcap(order.executed.comm):.6f}, Size: {order.executed.size:.2f}')
                 # If all positions are closed after a sell (either TP or SL), reset the strategy state
                 if not self.getposition(self.datas[0]):  # Check if position size is zero
                     self.log("All positions closed. Resetting strategy state.")
@@ -142,14 +143,17 @@ class FastScalperStrategy(bt.Strategy):
         Handles notifications about trade closures (when a buy and sell fully offset).
         """
         if trade.isclosed:
-            self.log(f'TRADE PNL, Gross {trade.pnl:.2f}, Net {trade.pnlcomm:.2f}')
+            if self.p.data_in_market_cap:
+                self.log(f'TRADE PNL, Gross {trade.pnl/1_000_000_000:.6f}, Net {trade.pnlcomm/1_000_000_000:.6f}')
+            else:
+                self.log(f'TRADE PNL, Gross {trade.pnl:.2f}, Net {trade.pnlcomm:.2f}')
 
     def notify_cashvalue(self, cash, value):
         """
         Receives the current fund value, value status of the strategy’s broker
         """
         if cash != self.old_cash:
-            self.log(f"Change in cash value cash:{self.cash_when_mcap(cash)} ,value:{self.cash_when_mcap(value)}")
+            self.log(f"Change in cash/value cash:{self.cash_when_mcap(cash):.6f} ,value:{self.cash_when_mcap(value):.6f}")
             self.old_cash = cash
             self.old_value = value
     # --------------------------------- notifies end ---------------------------------
@@ -257,7 +261,7 @@ class FastScalperStrategy(bt.Strategy):
         # Scenario 1: Initial Buy (No open position, RSI < 40)
         if current_position_size == 0 and self.rsi[0] < 40:
             if self.broker.getcash() > 0:
-                self.log(f'INITIAL BUY (RSI < 40): Attempting to buy at {current_price}')
+                self.log(f'INITIAL BUY (RSI < 40): Attempting to buy at {self._format_value_for_log_mcap(current_price)} price.')
                 self.buy()  # Sizer defines the buy size.
                 # After the buy, _update_portfolio_stats and has_done_initial_buy flags will be set via notify_order.
 
@@ -265,5 +269,5 @@ class FastScalperStrategy(bt.Strategy):
         # We will add if PnL is -10% or lower and RSI < 40 (optional, but safer).
         elif current_position_size > 0 and pnl_percent <= self.p.martingale_loss_trigger and self.rsi[0] < 40:
             if self.broker.getcash() > 0:
-                self.log(f'MARTINGALE BUY (PnL {pnl_percent*100:.2f}%): Adding position at {current_price}')
+                self.log(f'MARTINGALE BUY (PnL {pnl_percent*100:.2f}%): Adding position at {self._format_value_for_log_mcap(current_price)} price.')
                 self.buy()
