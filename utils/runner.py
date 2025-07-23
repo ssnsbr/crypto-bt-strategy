@@ -3,7 +3,7 @@ import numpy as np
 import os
 
 import backtrader as bt
-from commission.CustomSolanaCommission import CustomSolanaCommission
+from commissions.CustomSolanaCommission import CustomSolanaCommission
 from sizers.FiboMartingaleSizer import FiboMartingaleSizer
 from strategies import FiboMartingaleStrategy
 from utils.data_utils import ready_df
@@ -29,6 +29,65 @@ class CashHistoryAnalyzer(bt.Analyzer):
         return self.cash_history
 
 
+def _configure_cerebro(
+    cerebro: bt.Cerebro,
+    df: pd.DataFrame,
+    strategy_class: type,
+    strategy_params: dict,
+    sizer_class: type,
+    sizer_params: dict,
+    commission_class: type,
+    initial_cash: float,
+    is_mcap: bool
+):
+    """
+    Helper function to configure a Backtrader Cerebro object.
+    """
+    print(f"[RUN] Strategy: {strategy_class.__name__}, Params: {strategy_params}")
+    cerebro.addstrategy(strategy_class, **strategy_params)
+
+    data = bt.feeds.PandasData(
+        dataname=df,
+        datetime='datetime',
+        open='open',
+        high='high',
+        low='low',
+        close='close',
+        volume='volume',
+        timeframe=bt.TimeFrame.Seconds,
+        compression=1
+    )
+    cerebro.adddata(data)
+
+    # REGISTER YOUR SIZER
+    print(f"[RUN] Sizer: {sizer_class.__name__}, Params: {sizer_params}")
+    cerebro.addsizer(sizer_class, **sizer_params)
+
+    if is_mcap:
+        cerebro.broker.setcash(initial_cash * 1_000_000_000)
+        print(f"[RUN] In MCAP mode. Cash: {initial_cash}B, In-App Cash: {initial_cash * 1_000_000_000:.2f}")
+    else:
+        cerebro.broker.setcash(initial_cash)
+        print(f"[RUN] Not in MCAP mode. Cash: {initial_cash:.2f}")
+
+    print(f"[RUN] Commission: {commission_class.__name__}")
+    cerebro.broker.addcommissioninfo(commission_class())
+
+    # Add analyzers
+    print("[RUN] Adding Analyzers and Observers.")
+    cerebro.addanalyzer(bt.analyzers.SharpeRatio, _name='mysharpe')
+    cerebro.addanalyzer(bt.analyzers.DrawDown, _name='mydrawdown')
+    cerebro.addanalyzer(bt.analyzers.TradeAnalyzer, _name='mytradeanalyzer')
+    cerebro.addanalyzer(bt.analyzers.Returns, _name='myreturns')
+    cerebro.addanalyzer(bt.analyzers.PositionsValue, _name='mypositionsvalue')  # To get portfolio history
+    cerebro.addanalyzer(CashHistoryAnalyzer, _name='mycashvalue')         # To get CASH history
+
+    # Add observers (for plotting later)
+    cerebro.addobserver(bt.observers.Broker)
+    cerebro.addobserver(bt.observers.BuySell)
+    cerebro.addobserver(bt.observers.Trades)
+
+
 def run_backtest_for_df(df, coin_name,
                         sizer_class=None,
                         strategy_class=None,
@@ -51,67 +110,33 @@ def run_backtest_for_df(df, coin_name,
     Returns:
         tuple: (dict of analysis results, bt.Cerebro object)
     """
-    if strategy_params is None:
-        strategy_params = {}
+    strategy_params = strategy_params or {}
+    sizer_params = sizer_params or {}
 
     cerebro = bt.Cerebro()
 
-    # Pass the strategy_params dictionary using **kwargs
-    print("[RUN] ", "Strategy:", strategy_class.__name__, ",strategy_class.params:", strategy_params)
-    cerebro.addstrategy(strategy_class, **strategy_params)
-
-    data = bt.feeds.PandasData(
-        dataname=df,
-        datetime='datetime',
-        open='open',
-        high='high',
-        low='low',
-        close='close',
-        volume='volume',
-        timeframe=bt.TimeFrame.Seconds,
-        compression=1
+    _configure_cerebro(
+        cerebro=cerebro,
+        df=df,
+        strategy_class=strategy_class,
+        strategy_params=strategy_params,
+        sizer_class=sizer_class,
+        sizer_params=sizer_params,
+        commission_class=commission_class,
+        initial_cash=cash,
+        is_mcap=mcap
     )
-    cerebro.adddata(data)
 
-    # REGISTER YOUR SIZER
-    # cerebro.addsizer(DynamicTrendHybridSizer,stake=0.1)
-    # cerebro.addsizer(bt.sizers.FixedSize, stake=10) # Example of adding a sizer
-    print("[RUN] ", "Sizer:", sizer_class.__name__, ",sizer_params.params:", sizer_params)
-    cerebro.addsizer(sizer_class, **sizer_params)
-
-    if mcap:
-        cerebro.broker.setcash(cash * 1_000_000_000)
-        print("[RUN] in mcap", mcap, "Cash:", cash, " In App Cash:", cash * 1_000_000_000)
-    else:
-        cerebro.broker.setcash(cash)
-        print("[RUN] in mcap", mcap, "Cash:", cash, " In App Cash:", cash)
-
-    # REGISTER YOUR COMMISSION
-    print("[RUN] ", "Commission:", commission_class.__name__)
-    cerebro.broker.addcommissioninfo(commission_class())
-
-    # Add analyzers
-    print("[RUN] ", "Adding Analyzers and Observers.")
-    cerebro.addanalyzer(bt.analyzers.SharpeRatio, _name='mysharpe')
-    cerebro.addanalyzer(bt.analyzers.DrawDown, _name='mydrawdown')
-    cerebro.addanalyzer(bt.analyzers.TradeAnalyzer, _name='mytradeanalyzer')
-    cerebro.addanalyzer(bt.analyzers.Returns, _name='myreturns')
-    cerebro.addanalyzer(bt.analyzers.PositionsValue, _name='mypositionsvalue')  # To get portfolio history
-    cerebro.addanalyzer(CashHistoryAnalyzer, _name='mycashvalue')         # To get CASH history
-
-    # Add observers (for plotting later)
-    cerebro.addobserver(bt.observers.Broker)
-    cerebro.addobserver(bt.observers.BuySell)
-    cerebro.addobserver(bt.observers.Trades)
     if mcap:
         print(f'[RUN] Starting backtest for {coin_name} - Initial Portfolio Value: {cerebro.broker.getvalue()/1_000_000_000:.2f}')
     else:
         print(f'[RUN] Starting backtest for {coin_name} - Initial Portfolio Value: {cerebro.broker.getvalue():.2f}')
+
     results = cerebro.run()
     strategy = results[0]
-    print("[RUN] ", "Cerebro Ended.")
-    final_portfolio_value = cerebro.broker.getvalue()
+    print("[RUN] Cerebro Ended.")
 
+    final_portfolio_value = cerebro.broker.getvalue()
     if mcap:
         final_portfolio_value = final_portfolio_value / 1_000_000_000
     print(f'[RUN] Final Portfolio Value for {coin_name}: {final_portfolio_value:.2f}')
@@ -131,14 +156,8 @@ def run_backtest_for_df(df, coin_name,
     print('Analyze:')
     for k, v in analysis_results.items():
         print("[RUN] ", k, v)
-    # Extract portfolio history for plotting
-    # The PositionsValue analyzer can give us the portfolio value over time.
-    # We need to iterate through the cerebro's data to get the dates
-    # And the analyzer to get the corresponding values.
-    # Note: bt.observers.Value also provides portfolio history, but it's simpler to
-    # extract from an analyzer if you're already using them.
 
-    # Extract portfolio history
+    # Extract portfolio history for plotting
     portfolio_history = {}
     for dt, value_list in strategy.analyzers.mypositionsvalue.get_analysis().items():
         np_value_array = np.array(value_list)
@@ -152,22 +171,19 @@ def run_backtest_for_df(df, coin_name,
 
         # portfolio_history[dt] = value # dt is already a datetime object
     portfolio_history_series = pd.Series(portfolio_history).sort_index()
-    # print(portfolio_history_series.tolist())
 
-    # Extract CASH history
-    cash_history = {}
-    for dt, value in strategy.analyzers.mycashvalue.get_analysis().items():
-        cash_history[dt] = value  # dt is already a datetime object
+    # Extract CASH history , dt is already a datetime object
+    cash_history = {dt: value for dt, value in strategy.analyzers.mycashvalue.get_analysis().items()}
     cash_history_series = pd.Series(cash_history).sort_index()
 
     if mcap:
         cash_history_series = cash_history_series / 1_000_000_000
+
     if print_cash_history:
         print("[RUN] Cash History:", cash_history_series.tolist())
-
-    combined_array = np.column_stack((cash_history_series.values, portfolio_history_series.values))
-    result_list_of_lists = combined_array.tolist()
-    print("[RUN] Full History:", result_list_of_lists)
+        combined_array = np.column_stack((cash_history_series.values, portfolio_history_series.values))
+        result_list_of_lists = combined_array.tolist()
+        print("[RUN] Full History:", result_list_of_lists)
 
     return analysis_results, cerebro, cash_history_series
 
