@@ -177,17 +177,25 @@ def process_coin(file_path):
     return df, features
 
 
-# pip install pyarrow
+#! pip install pyarrow
 
 
 # Main processor for a folder of CSVs
-def process_all(all_csv_files):
+def process_all(all_csv_files, out_folder='features', force=False):
+    os.makedirs(out_folder, exist_ok=True)  # Create output folder if missing
+
     for f in all_csv_files:
-        print("File", f)
+        base = os.path.basename(f).replace('.csv', '_features.parquet')
+        out_path = os.path.join(out_folder, base)
+
+        if os.path.exists(out_path) and not force:
+            print(f"✅ Skipping {base} (already processed)")
+            continue
+        print(f"🔄 Processing {f}")
         df, meta = process_coin(f)
-        save_name = f.replace('.csv', '_features.parquet')
-        df.to_parquet(save_name)
-        print("Saved to", save_name)
+        df.to_parquet(out_path)
+        print(f"💾 Saved to {out_path}")
+
     # results = {}
     # meta = {}
     # folder='candles_1s'
