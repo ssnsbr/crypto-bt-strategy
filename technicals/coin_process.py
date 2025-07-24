@@ -178,10 +178,18 @@ def process_coin(file_path):
 
 
 #! pip install pyarrow
+def detect_timeframe(df):
+    # Ensure datetime index
+    diffs = pd.to_datetime(df["time"][100:200], unit="ms").diff().dropna()
+    median_delta = diffs.median()
+    # Convert timedelta to seconds
+    seconds = median_delta.total_seconds()
+    # Round to nearest int second, or keep as float for sub-second
+    return seconds
 
 
 # Main processor for a folder of CSVs
-def process_all(all_csv_files, out_folder='features', force=False):
+def process_all(all_csv_files, out_folder='features', force=False, allowed_timeframes=[1, 15]):
     os.makedirs(out_folder, exist_ok=True)  # Create output folder if missing
 
     for f in all_csv_files:
@@ -191,6 +199,14 @@ def process_all(all_csv_files, out_folder='features', force=False):
         if os.path.exists(out_path) and not force:
             print(f"✅ Skipping {base} (already processed)")
             continue
+
+        tf_seconds = detect_timeframe(pd.read_csv(f))
+        print(f"Detected timeframe: {tf_seconds} seconds")
+
+        if tf_seconds not in allowed_timeframes:
+            print(f"⚠️ Skipping {base} due to timeframe {tf_seconds}s not in allowed {allowed_timeframes}")
+            continue
+
         print(f"🔄 Processing {f}")
         df, meta = process_coin(f)
         df.to_parquet(out_path)
