@@ -2,7 +2,8 @@ import os
 import pandas as pd
 
 from sizers.ScalperMartingaleSizer import ScalperMartingaleSizer
-from strategies.Fibo78 import FiboR
+from strategies.Fibo78Once import FiboR78Once
+
 from strategies.MAMACDStrategy import MAMACDStrategy
 from strategies.FastScalperStrategy import FastScalperStrategy
 from strategies.FiboCheck import FiboChecker
@@ -51,17 +52,18 @@ if __name__ == "__main__":
     # strategy_class = FastScalperStrategy
     # strategy_class = FiboChecker
     # strategy_class = MAMACDStrategy
-    strategy_class = FiboR
+    strategy_class = FiboR78Once
     strategy_params = {'data_in_market_cap': mcap, "log": log}
-    # sizer_class = bt.sizers.FixedSize()
-    sizer_class = ScalperMartingaleSizer
+    sizer_class = bt.sizers.FixedSize
+
+    # sizer_class = Fibo78Once
     sizer_params = {
         "initial_buy_amount_factor": strategy_params.get('initial_buy_amount_factor', 0.05),
         "martingale_multiplier": strategy_params.get('martingale_multiplier', 2.0),
         "data_in_market_cap": mcap,
         "log": sizer_log
     }
-    sizer_class = bt.sizers.PercentSizer
+    # sizer_class = bt.sizers.PercentSizer
     sizer_params = None
     all_results_df, all_cerebros_objects, all_portfolio_histories = run_all([file_csv],
                                                                             sizer_class=sizer_class,

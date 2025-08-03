@@ -54,12 +54,12 @@ class FiboR78Once(BaseTradingStrategy):
         # self.fibo_buy = 0.786
         self.Fibonacci_Buy_MCAP_78 = 0
         self.bought_78 = False
-        self.once = True
+        self.only_once = True
 
     def update_ath(self):
         if super().update_ath():
             self.Fibonacci_Buy_MCAP_78 = self.ath * self.fibo_buy
-            if not self.once:
+            if not self.only_once:
                 self.bought_78 = False
 
     def _execute_trading_logic(self):

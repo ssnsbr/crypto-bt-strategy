@@ -218,8 +218,7 @@ def run_all(csv_files,
         df = ready_df(df, mcap=mcap)
         coin_name = os.path.basename(csv_file).split('.')[0][17:27]  # Assuming coin name is the filename without extension
 
-        try:
-            analysis_result, cerebro_obj, portfolio_history_series = run_backtest_for_df(
+        analysis_result, cerebro_obj, portfolio_history_series = run_backtest_for_df(
                 df[df_start_margin:df_end_margin],
                 coin_name=coin_name,
                 strategy_class=strategy_class,
@@ -229,16 +228,31 @@ def run_all(csv_files,
                 mcap=mcap,
                 commission_class=CustomSolanaCommission,
                 sizer_params=sizer_params)
-            all_results.append(analysis_result)
-            all_cerebros[coin_name] = cerebro_obj
-            all_portfolio_histories[coin_name] = portfolio_history_series
-        except Exception as e:
-            print(f"Error running backtest for {coin_name}: {e}")
-            # Optionally add a placeholder result for failed backtests
-            all_results.append({'coin': coin_name, 'final_value': 'Error', 'sharpe_ratio': 'Error',
-                                'max_drawdown': 'Error', 'total_trades': 'Error',
-                                'winning_trades': 'Error', 'losing_trades': 'Error',
-                                'annualized_return': 'Error'})
+        all_results.append(analysis_result)
+        all_cerebros[coin_name] = cerebro_obj
+        all_portfolio_histories[coin_name] = portfolio_history_series
+            
+        # try:
+        #     analysis_result, cerebro_obj, portfolio_history_series = run_backtest_for_df(
+        #         df[df_start_margin:df_end_margin],
+        #         coin_name=coin_name,
+        #         strategy_class=strategy_class,
+        #         cash=cash,
+        #         sizer_class=sizer_class,
+        #         strategy_params=strategy_params,
+        #         mcap=mcap,
+        #         commission_class=CustomSolanaCommission,
+        #         sizer_params=sizer_params)
+        #     all_results.append(analysis_result)
+        #     all_cerebros[coin_name] = cerebro_obj
+        #     all_portfolio_histories[coin_name] = portfolio_history_series
+        # except Exception as e:
+        #     print(f"Error running backtest for {coin_name}: {e}")
+        #     # Optionally add a placeholder result for failed backtests
+        #     all_results.append({'coin': coin_name, 'final_value': 'Error', 'sharpe_ratio': 'Error',
+        #                         'max_drawdown': 'Error', 'total_trades': 'Error',
+        #                         'winning_trades': 'Error', 'losing_trades': 'Error',
+        #                         'annualized_return': 'Error'})
 
     results_df = pd.DataFrame(all_results)
     return results_df, all_cerebros, all_portfolio_histories

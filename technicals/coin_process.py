@@ -180,25 +180,33 @@ def process_coin(file_path):
 #! pip install pyarrow
 def detect_timeframe(df):
     # Ensure datetime index
-    diffs = pd.to_datetime(df["time"][100:200], unit="ms").diff().dropna()
+    max_volume_index = df["volume"].idxmax()
+    margin = 20
+    # diffs = pd.to_datetime(df["time"][max_volume_index-margin:max_volume_index+margin], unit="ms").diff().dropna()
+    # diffs = pd.to_datetime(df["time"], unit="ms").diff().dropna()
+    diffs = pd.to_datetime(df["time"][100:300], unit="ms").diff().dropna()
+
     median_delta = diffs.median()
     # Convert timedelta to seconds
-    seconds = median_delta.total_seconds()
-    # Round to nearest int second, or keep as float for sub-second
-    return seconds
+    median = median_delta.total_seconds()
+    min = diffs.min().total_seconds()
+    mean = diffs.mean().total_seconds()
 
+    # Round to nearest int second, or keep as float for sub-second
+    print("Median: ", median, "  Min:", min, "  Mean:", mean)
+    # print(df[max_volume_index-margin:max_volume_index+margin].head(3))
+    return min
 
 # Main processor for a folder of CSVs
-def process_all(all_csv_files, out_folder='features', force=False, allowed_timeframes=[1, 15]):
+
+
+def process_all(all_csv_files, out_folder='features', force=False, allowed_timeframes=[1]):
     os.makedirs(out_folder, exist_ok=True)  # Create output folder if missing
     index = 0
     for f in all_csv_files:
+        index = index + 1
         base = os.path.basename(f).replace('.csv', '_features.parquet')
         out_path = os.path.join(out_folder, base)
-
-        if os.path.exists(out_path) and not force:
-            print(f"✅ Skipping {base} (already processed)")
-            continue
 
         tf_seconds = detect_timeframe(pd.read_csv(f))
         print(f"Detected timeframe: {tf_seconds} seconds.")
@@ -207,11 +215,14 @@ def process_all(all_csv_files, out_folder='features', force=False, allowed_timef
             print(f"⚠️ Skipping {base} due to timeframe {tf_seconds}s not in allowed {allowed_timeframes}")
             continue
 
+        if os.path.exists(out_path) and not force:
+            print(f"✅ Skipping {base} (already processed)")
+            continue
+
         print(f"🔄 Processing {index}/{len(all_csv_files)}, {f}")
         df, meta = process_coin(f)
         df.to_parquet(out_path)
         print(f"💾 Saved to {out_path}")
-        index = index + 1
 
     # results = {}
     # meta = {}
