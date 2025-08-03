@@ -81,6 +81,7 @@ class BaseTradingStrategy(bt.Strategy):
 
         # ATH and Migration tracking
         self.ath = 0.0
+        self.ath_changed = False
         self.migrated = False
         self.ath_update_thrshld = 1.05
         self.green_candle_streak = 0
@@ -99,6 +100,7 @@ class BaseTradingStrategy(bt.Strategy):
         self.current_volume = 0  # Initialized for FastScalperStrategy
 
     # --- Utility Methods ---
+
     def cash_when_mcap(self, value):
         if self.p.data_in_market_cap:
             return value / 1_000_000_000
@@ -138,6 +140,7 @@ class BaseTradingStrategy(bt.Strategy):
         if self.ath == 0.0 or self.dataclose[0] > self.ath * self.ath_update_thrshld:
             self.ath = max(self.ath, self.datahigh[0])
             self.log(f"New ATH updated to {self._format_value_for_log_mcap(self.ath)}")
+            self.ath_changed = True  # make it False if you need it in your strategy. BaseTradingStrategy only set it to true.
             return True
         return False
 
@@ -246,7 +249,7 @@ class BaseTradingStrategy(bt.Strategy):
         Returns True if any risk management action was taken (order placed), False otherwise.
         """
         if not self.risk_manager:
-            self.log("Error: Risk manager not initialized for this strategy.")
+            self.log("Warning: Risk manager not initialized for this strategy.")
             return False
 
         # Order of priority for exits: SL > Emergency Exit > Trailing SL > Trailing TP > Dynamic TP > Fixed TP

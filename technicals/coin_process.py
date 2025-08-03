@@ -191,7 +191,7 @@ def detect_timeframe(df):
 # Main processor for a folder of CSVs
 def process_all(all_csv_files, out_folder='features', force=False, allowed_timeframes=[1, 15]):
     os.makedirs(out_folder, exist_ok=True)  # Create output folder if missing
-
+    index = 0
     for f in all_csv_files:
         base = os.path.basename(f).replace('.csv', '_features.parquet')
         out_path = os.path.join(out_folder, base)
@@ -201,16 +201,17 @@ def process_all(all_csv_files, out_folder='features', force=False, allowed_timef
             continue
 
         tf_seconds = detect_timeframe(pd.read_csv(f))
-        print(f"Detected timeframe: {tf_seconds} seconds")
+        print(f"Detected timeframe: {tf_seconds} seconds.")
 
         if tf_seconds not in allowed_timeframes:
             print(f"⚠️ Skipping {base} due to timeframe {tf_seconds}s not in allowed {allowed_timeframes}")
             continue
 
-        print(f"🔄 Processing {f}")
+        print(f"🔄 Processing {index}/{len(all_csv_files)}, {f}")
         df, meta = process_coin(f)
         df.to_parquet(out_path)
         print(f"💾 Saved to {out_path}")
+        index = index + 1
 
     # results = {}
     # meta = {}
