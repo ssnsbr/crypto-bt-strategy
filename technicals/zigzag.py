@@ -1,3 +1,4 @@
+import os
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -5,6 +6,7 @@ import pandas as pd
 # from utils.utils import format_marketcap
 # from zigzag import peak_valley_pivots
 from zigzag import *
+from utils.data_utils import ready_df
 
 
 def format_marketcap(marketcap):
@@ -183,6 +185,10 @@ def ath_rel(pdf):
     ath_index = pivot_prices.idxmax()
     ath = pivot_prices.max()
     pdf["ath_rel"] = pivot_prices / ath
+    # Mark position relative to ATH
+    pdf["after_ath"] = pivot_prices.index.to_series().apply(
+        lambda idx: -1 if idx < ath_index else (1 if idx > ath_index else 0)
+    )
     return pdf
 
 
@@ -207,72 +213,73 @@ def custom_print(pdf):
     print(get_means(pdf[:ath_index]["pct_changes"]), "**ATH**", get_means(pdf[ath_index:]["pct_changes"]))
 
 
-def main(df_file):
-
-    # df = pd.read_csv("file")
-    # prices = [100, 150, 100, 200, 150, 300, 100]
-    # df = pd.DataFrame()
-    # df["close"] = prices
+def main(df_file, log=False, draw=False):
     df, pdf = get_pivots(ready_df(pd.read_csv(df_file), True), 0.4, -0.4)
-
     pivot_indices = pdf["pivot_idx"]
     pivot_prices = pdf["pivot_prices"]
     pivot_idx = pdf["pivot_idx"]
-    # print(df)
     pdf = ath_rel(pdf)
-    # print(pdf)
     pivot_changes(pdf)
     pdf["next_wave_pct_changes"] = pdf["pct_changes"].shift(-1)
     # relative_changes = get_relative_changes(pdf)
     # pdf["relative_changes"] = relative_changes
     custom_print(pdf)
-    print(df_file)
     pdf["name"] = os.path.basename(df_file)
-    print(pdf)
+    pdf["sort_index"] = pdf.index
+    if log:
+        print(df_file)
+        print(pdf)
 
-    plot_pivot_1(df, pdf)
+    if draw:
+        plot_pivot_1(df, pdf)
     return pdf
 
 
-# pdf = main(csv_files_1s[192])
-# pdf
-# pdf = main(csv_files_1s[192])
-# pdf
-
-# output_folder = '/content/drive/MyDrive/charts/1s_pivots/'
-
-
-# Make and Save
-# os.makedirs(output_folder, exist_ok=True)
-
-# for i, path in enumerate(csv_files_1s):
-#     print(i,"of",len(csv_files_1s))
-#     try:
-#         pdf = main(path)
-#         name = os.path.basename(path).replace(".csv", "_pdf.csv")
-#         pdf.to_csv(os.path.join(output_folder, name), index=False)
-#     except Exception as e:
-#         print(f"Error in {path}: {e}")
+def make_save_pdf(csv_files_1s, output_folder='/content/drive/MyDrive/charts/1s_pivots/'):
+    os.makedirs(output_folder, exist_ok=True)
+    for i, path in enumerate(csv_files_1s):
+        print(i, "of", len(csv_files_1s))
+        try:
+            pdf = main(path)
+            name = os.path.basename(path).replace(".csv", "_pdf.csv")
+            pdf.to_csv(os.path.join(output_folder, name), index=False)
+        except Exception as e:
+            print(f"Error in {path}: {e}")
 
 
-# Read and concat
-# csv_files_pdf = [output_folder+f for f in os.listdir(output_folder) if f.endswith('.csv')]
-# all_pdfs = []
-# for path in enumerate(csv_files_pdf):
-#     print(i,"of",len(csv_files_1s))
-#     try:
-#         pdf = pd.read_csv(path)
-#         pdf["sort_index"] = pdf.index
-#         all_pdfs.append(pdf)
-#     except Exception as e:
-#         print(f"Error in {path}: {e}")
+def read_concat_pdf(pdfs_folder='/content/drive/MyDrive/charts/1s_pivots/', full_save_path="/content/drive/MyDrive/charts/all_pdf_combined.csv"):
+    csv_files_pdf = [pdfs_folder + f for f in os.listdir(pdfs_folder) if f.endswith('.csv')]
+    all_pdfs = []
+    for i, path in enumerate(csv_files_pdf):
+        print(i, "of", len(csv_files_pdf))
+        try:
+            pdf = pd.read_csv(path)
+            all_pdfs.append(pdf)
+        except Exception as e:
+            print(f"Error in {path}: {e}")
 
-# # Combine and save
-# df_combined = pd.concat(all_pdfs, ignore_index=True)
-# df_combined.to_csv("/content/drive/MyDrive/charts/all_pdf_combined.csv", index=False)
-
-
-# Both
+    # Combine and save
+    df_combined = pd.concat(all_pdfs, ignore_index=True)
+    df_combined.to_csv(full_save_path, index=False)
 
 
-# pd.read_csv("/content/drive/MyDrive/charts/all_pdf_combined.csv")
+def make_save_all(csv_files_1s, full_save_path="/content/drive/MyDrive/charts/all_pdf_combined.csv"):
+    # Both
+    all_pdfs = []
+
+    for i, path in enumerate(csv_files_1s):
+        if i % 20 == 0:
+            print(i, "of", len(csv_files_1s))
+        try:
+            pdf = main(path)
+            name = os.path.basename(path).replace(".csv", "_pdf.csv")
+            all_pdfs.append(pdf)
+
+            # pdf.to_csv(os.path.join(output_folder, name), index=False)
+        except Exception as e:
+            print(f"Error in {path}: {e}")
+
+    # # Combine and save
+    df_combined = pd.concat(all_pdfs, ignore_index=True)
+    df_combined.to_csv(full_save_path, index=False)
+    print(f"saved {len(df_combined)} rows in ", full_save_path)
