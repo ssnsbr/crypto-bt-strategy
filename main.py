@@ -2,12 +2,13 @@ import os
 import pandas as pd
 
 from sizers.ScalperMartingaleSizer import ScalperMartingaleSizer
+from strategies.SimpleMartingaleStrategy import MartingaleSizer, SimpleMartingaleStrategy
 from strategies.Fibo78Once import FiboR78Once
 
-from strategies.MAMACDStrategy import MAMACDStrategy
-from strategies.FastScalperStrategy import FastScalperStrategy
-from strategies.FiboCheck import FiboChecker
-from strategies.SimpleTest import SimpleTest
+# from strategies.MAMACDStrategy import MAMACDStrategy
+# from strategies.FastScalperStrategy import FastScalperStrategy
+# from strategies.FiboCheck import FiboChecker
+# from strategies.SimpleTest import SimpleTest
 from utils.data_utils import ready_df
 from utils.plotting_utils import plot_all_portfolio_histories, plot_all_portfolio_histories_by_time, plot_single_backtest
 from utils.runner import run_all  # Import pandas for data preparation
@@ -52,17 +53,18 @@ if __name__ == "__main__":
     # strategy_class = FastScalperStrategy
     # strategy_class = FiboChecker
     # strategy_class = MAMACDStrategy
-    strategy_class = FiboR78Once
+    # strategy_class = FiboR78Once
+    strategy_class = SimpleMartingaleStrategy
     strategy_params = {'data_in_market_cap': mcap, "log": log}
     sizer_class = bt.sizers.FixedSize
 
-    # sizer_class = Fibo78Once
-    sizer_params = {
-        "initial_buy_amount_factor": strategy_params.get('initial_buy_amount_factor', 0.05),
-        "martingale_multiplier": strategy_params.get('martingale_multiplier', 2.0),
-        "data_in_market_cap": mcap,
-        "log": sizer_log
-    }
+    sizer_class = MartingaleSizer
+    # sizer_params = {
+    #     "initial_buy_amount_factor": strategy_params.get('initial_buy_amount_factor', 0.05),
+    #     "martingale_multiplier": strategy_params.get('martingale_multiplier', 2.0),
+    #     "data_in_market_cap": mcap,
+    #     "log": sizer_log
+    # }
     # sizer_class = bt.sizers.PercentSizer
     sizer_params = None
     all_results_df, all_cerebros_objects, all_portfolio_histories = run_all([file_csv],

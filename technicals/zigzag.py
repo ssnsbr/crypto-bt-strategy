@@ -180,6 +180,18 @@ def plot_pivot_1(df, pdf):
     plt.show()
 
 
+def after_migration(df, migraion_mcap=70_000):
+    migration_price = 70_000
+    pivot_prices = df["pivot_prices"]
+
+    migration_idx = df[df["pivot_prices"] > migration_price].index
+    first_migration_time = migration_idx[0]
+    df["after_migraion"] = pivot_prices.index.to_series().apply(
+        lambda idx: 0 if idx < first_migration_time else 1
+    )
+    return df
+
+
 def ath_rel(pdf):
     pivot_prices = pdf["pivot_prices"]
     ath_index = pivot_prices.idxmax()
@@ -213,19 +225,25 @@ def custom_print(pdf):
     print(get_means(pdf[:ath_index]["pct_changes"]), "**ATH**", get_means(pdf[ath_index:]["pct_changes"]))
 
 
-def main(df_file, log=False, draw=False):
-    df, pdf = get_pivots(ready_df(pd.read_csv(df_file), True), 0.4, -0.4)
+def main(df_file, log=False, draw=False, up_thresh=0.4, down_thresh=-0.4):
+    df, pdf = get_pivots(ready_df(pd.read_csv(df_file), True), up_thresh=up_thresh, down_thresh=down_thresh)
     pivot_indices = pdf["pivot_idx"]
     pivot_prices = pdf["pivot_prices"]
     pivot_idx = pdf["pivot_idx"]
     pdf = ath_rel(pdf)
-    pivot_changes(pdf)
+    pdf = pivot_changes(pdf)
+    pdf = after_migration(pdf)
     pdf["next_wave_pct_changes"] = pdf["pct_changes"].shift(-1)
     # relative_changes = get_relative_changes(pdf)
     # pdf["relative_changes"] = relative_changes
     custom_print(pdf)
-    pdf["name"] = os.path.basename(df_file)
     pdf["sort_index"] = pdf.index
+
+    # pdf["after_before_ration"] = pdf["pct_changes"] / pdf["next_wave_pct_changes"] * -1
+    pdf["before_after_pct_ratio"] = pdf["next_wave_pct_changes"] / pdf["pct_changes"] * -1
+
+    pdf["name"] = os.path.basename(df_file)
+
     if log:
         print(df_file)
         print(pdf)
