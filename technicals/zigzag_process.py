@@ -4,9 +4,8 @@ import numpy as np
 import pandas as pd
 # from ..utils.utils import format_marketcap
 # from utils.utils import format_marketcap
-# from zigzag import peak_valley_pivots
 from zigzag import *
-from utils.data_utils import ready_df
+# from utils.data_utils import ready_df
 
 
 def format_marketcap(marketcap):
@@ -76,6 +75,7 @@ def get_pivots(df, up_thresh=0.3, down_thresh=-0.3):
     timestamps = df.index  # assuming index is datetime
 
     # Detect pivots (e.g., require ±30% move to switch trend)
+
     pivots = peak_valley_pivots(prices, up_thresh=up_thresh, down_thresh=down_thresh)
     # pivot_indices, pivot_prices, pct_changes, relative_changes = zigzag_percent_changes(prices, 0.1)
     # df["pivots"] = pivots
@@ -201,6 +201,17 @@ def ath_rel(pdf):
     pdf["after_ath"] = pivot_prices.index.to_series().apply(
         lambda idx: -1 if idx < ath_index else (1 if idx > ath_index else 0)
     )
+
+    start_timestamp = pdf["pivot_timestamp"].values[0]
+    pdf["age"] = pdf["pivot_timestamp"] - start_timestamp
+    pdf["age"] = pdf["age"] / 1000
+    ath_timestamp = pdf["pivot_timestamp"].values[ath_index]
+    pdf["age_ath_rel"] = pdf["pivot_timestamp"] - ath_timestamp
+    pdf["age_ath_rel"] = (pdf["age_ath_rel"] / 1000).abs()
+
+    pdf["age_ath_rel_by_idx"] = pdf.index - ath_index
+    pdf["age_ath_rel_by_idx"] = pdf["age_ath_rel_by_idx"].abs()
+
     return pdf
 
 
@@ -223,6 +234,30 @@ def custom_print(pdf):
         return f" mean ↓:{downer.mean():.2f} ↑:{uptre.mean():.2f}, count=↓:{len(downer)} ↑:{len(uptre)}   sums: ↓:{downer.sum():.2f} ↑:{uptre.sum():.2f}"
 
     print(get_means(pdf[:ath_index]["pct_changes"]), "**ATH**", get_means(pdf[ath_index:]["pct_changes"]))
+
+
+def ready_df(df_input, mcap=False):  # Renamed df to df_input to avoid conflict with local variable
+    print("Preparing dataframe with size ", len(df_input))
+    df_input["timestamp"] = df_input["time"]  # Assuming original 'time' is the ms timestamp
+    df_input['time'] = pd.to_datetime(df_input['timestamp'], unit='ms')
+
+    # Ensure your column names exactly match what Backtrader expects or map them.
+    # Backtrader expects 'datetime', 'open', 'high', 'low', 'close', 'volume' by default.
+    # If your original CSV columns are different, you'd map them here.
+    # For example, if your original CSV has 'price_open', rename it to 'open'.
+
+    # Your current scaling:
+    if mcap:
+        for c in ["open", "high", "low", "close"]:
+            df_input[c] = df_input[c] * 1_000_000_000
+
+    # Add color column (not directly used by Backtrader data feed, but fine to keep in DF)
+    df_input['color'] = df_input.apply(lambda row: 'green' if row['close'] > row['open'] else 'red', axis=1)
+
+    # Crucially, rename the 'time' column to 'datetime' as Backtrader expects 'datetime'
+    df_input = df_input.rename(columns={'time': 'datetime'})
+
+    return df_input
 
 
 def main(df_file, log=False, draw=False, up_thresh=0.4, down_thresh=-0.4):
@@ -301,3 +336,6 @@ def make_save_all(csv_files_1s, full_save_path="/content/drive/MyDrive/charts/al
     df_combined = pd.concat(all_pdfs, ignore_index=True)
     df_combined.to_csv(full_save_path, index=False)
     print(f"saved {len(df_combined)} rows in ", full_save_path)
+
+
+# main("I:\\axiomchart\\15s_axiom_chart_bars_Ekv9HdumWqnXZgq5G6ge6bk1ZRHKXYC2WnSFL94sQmLJ_1752166201266.csv")

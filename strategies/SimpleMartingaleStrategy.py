@@ -13,27 +13,41 @@ class MartingaleSizer(bt.Sizer):
     This is a classic Martingale strategy, increasing risk after losses.
     """
     params = (
-        ('stake', 1),
+        ('stake_cash', 1000),  # Base cash amount for the initial position
         ('multiplier', 2),
         ('max_multiplier', 16),
     )
 
     def __init__(self):
         self.loss_streak = 0
+        self.cash_to_buy = self.p.stake_cash
 
     def notify_trade(self, trade):
         """
-        Updates the loss streak based on the outcome of a closed trade.
+        Updates the loss streak and cash to buy based on the outcome of a closed trade.
         """
         if trade.isclosed:
-            self.loss_streak = 0 if trade.pnl > 0 else self.loss_streak + 1
+            if trade.pnl > 0:
+                self.loss_streak = 0
+                self.cash_to_buy = self.p.stake_cash
+            else:
+                self.loss_streak += 1
+                multiplier = min(self.p.multiplier ** self.loss_streak, self.p.max_multiplier)
+                self.cash_to_buy = self.p.stake_cash * multiplier
 
     def _getsizing(self, comminfo, cash, data, isbuy):
         """
-        Calculates the position size for the next trade.
+        Calculates the position size (in units) for the next trade based on the
+        cash amount to be spent and the current price.
         """
-        multiplier = min(self.p.multiplier ** self.loss_streak, self.p.max_multiplier)
-        return self.p.stake * multiplier
+        if isbuy:
+            size = self.cash_to_buy / data.close[0]
+            # Ensure we don't try to buy more than available cash
+            if self.cash_to_buy > cash:
+                size = cash / data.close[0]
+            return size
+        else:  # Sell order
+            return self.getsizing(data)  # Close the entire position
 
 
 class MartingaleRiskManagement(AbstractRiskManagement):
@@ -93,8 +107,10 @@ class MartingaleRiskManagement(AbstractRiskManagement):
 
     def check_and_execute_dynamic_take_profit(self, current_price: float) -> bool:
         return False
+
     def check_and_execute_trailing_stop_loss(self, current_price: float) -> bool:
         return False
+
     def check_and_execute_trailing_take_profit(self, current_price: float) -> bool:
         return False
 
