@@ -180,14 +180,16 @@ def plot_pivot_1(df, pdf):
     plt.show()
 
 
-def after_migration(df, migraion_mcap=70_000):
-    migration_price = 70_000
+def after_migration(df, migration_price=70_000):
     pivot_prices = df["pivot_prices"]
 
     migration_idx = df[df["pivot_prices"] > migration_price].index
-    first_migration_time = migration_idx[0]
+    first_migration_time = None
+    if not migration_idx.empty:
+        first_migration_time = migration_idx[0]
+
     df["after_migraion"] = pivot_prices.index.to_series().apply(
-        lambda idx: 0 if idx < first_migration_time else 1
+        lambda idx: 0 if first_migration_time is None or idx < first_migration_time else 1
     )
     return df
 
@@ -224,9 +226,11 @@ def custom_print(pdf):
                 ]
     logstr_1 = get_string(pdf[:ath_index])
     logstr_2 = get_string(pdf[ath_index:])
+    print("*" * 20)
     print(logstr_1, f"**ATH:{format_marketcap(pivot_prices.max())}**")
-    print(f"**ATH:{format_marketcap(pivot_prices.max())}**")
+    print(f"**--- ATH :{format_marketcap(pivot_prices.max())} ---**")
     print(logstr_2)
+    print("*" * 20)
 
     def get_means(ser):
         downer = ser[ser < 0]
