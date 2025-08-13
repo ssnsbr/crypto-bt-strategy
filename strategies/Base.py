@@ -1,5 +1,6 @@
 import backtrader as bt
 from utils.utils import format_marketcap, format_price_to_marketcap
+from technicals.SafeRSI import SafeRSI
 
 
 class BaseTradingStrategy(bt.Strategy):
@@ -58,7 +59,7 @@ class BaseTradingStrategy(bt.Strategy):
         self.datahigh = self.datas[0].high
         self.datalow = self.datas[0].low
         self.datavolume = self.datas[0].volume
-        self.rsi = bt.indicators.RSI(self.datas[0].close, period=self.p.rsi_period)
+        self.rsi = SafeRSI(self.datas[0].close, period=self.p.rsi_period)
         # self.sma60 = bt.indicators.SimpleMovingAverage(self.datas[0].close, period=60)
         # self.sma30 = bt.indicators.SimpleMovingAverage(self.datas[0].close, period=30)
         # self.sma15 = bt.indicators.SimpleMovingAverage(self.datas[0].close, period=15)
