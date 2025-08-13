@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import pandas as pd
 
 from sizers.ScalperMartingaleSizer import ScalperMartingaleSizer
@@ -21,18 +22,23 @@ import backtrader as bt
 # Connect to Google Drive
 # drive.mount('/content/drive')
 if __name__ == "__main__":
-    # Define path to your CSV files
 
+    # Define path to your CSV files
+    print("backtrader:", bt.__version__)
+    print("numpy", np.__version__)
+    print("pandas", pd.__version__)
     folder_path = 'I:\\axiomchart\\'
     file_csv = "15s_axiom_chart_bars_Ekv9HdumWqnXZgq5G6ge6bk1ZRHKXYC2WnSFL94sQmLJ_1752166201266.csv"
+    pr_csv = "axiom_chart_bars_5KMVRYak5nsLHzrLjDCaxuF9FERZKHnBPEbQnu1ygTxH_1749690749089.csv "
     folder_path = 'I:\\axiomchart\\1s\\'
 
     # List all CSV files
     csv_files = [folder_path + f for f in os.listdir(folder_path) if f.endswith('.csv')]
     print(f"Found {len(csv_files)} CSV files.", [len(pd.read_csv(csv_files[df_index])) for df_index in range(len(csv_files))])
-    df_index = 3
+    df_index = 33
 
     file_csv = csv_files[df_index]
+    file_csv = folder_path + pr_csv
     print(csv_files[df_index])
     print(ready_df(pd.read_csv(csv_files[df_index]), True).head(2))
 

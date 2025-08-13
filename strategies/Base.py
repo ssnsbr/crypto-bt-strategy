@@ -1,6 +1,5 @@
 import backtrader as bt
 from utils.utils import format_marketcap, format_price_to_marketcap
-from technicals.SafeRSI import SafeRSI
 
 
 class BaseTradingStrategy(bt.Strategy):
@@ -36,7 +35,7 @@ class BaseTradingStrategy(bt.Strategy):
         ('dynamic_tp_pullback_percent', 0.01),   # Percentage pullback from peak to trigger DTP
 
         # indicators
-        ('rsi_period', 15),
+        ('rsi_period', 14),
         ('lookback_period', 50),  # Period to find the last significant high/low
         ('atr_period', 15),
         ('bb_period', 20),
@@ -59,7 +58,9 @@ class BaseTradingStrategy(bt.Strategy):
         self.datahigh = self.datas[0].high
         self.datalow = self.datas[0].low
         self.datavolume = self.datas[0].volume
-        self.rsi = SafeRSI(self.datas[0].close, period=self.p.rsi_period)
+        self.rsi = bt.indicators.RSI_Safe(self.datas[0].close, period=self.p.rsi_period)
+        # self.rsi = SafeRSI(self.datas[0].close, period=self.p.rsi_period)
+
         # self.sma60 = bt.indicators.SimpleMovingAverage(self.datas[0].close, period=60)
         # self.sma30 = bt.indicators.SimpleMovingAverage(self.datas[0].close, period=30)
         # self.sma15 = bt.indicators.SimpleMovingAverage(self.datas[0].close, period=15)
@@ -99,7 +100,7 @@ class BaseTradingStrategy(bt.Strategy):
         self.current_price = 0.0
         self.current_marketcap_str = ""
         self.current_volume = 0  # Initialized for FastScalperStrategy
-
+        print("Base Trading Strategy Initialized")
     # --- Utility Methods ---
 
     def cash_when_mcap(self, value):
@@ -230,7 +231,6 @@ class BaseTradingStrategy(bt.Strategy):
         take profit, initial buy, and Fibo retracement buys.
         """
         self.index += 1  # starts after indicators
-
         # Check if this is the last bar
         # print(len(self),  (self._last()), len(self.dataclose))
         if len(self) == self.data.buflen() - 1:
