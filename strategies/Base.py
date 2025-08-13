@@ -228,6 +228,13 @@ class BaseTradingStrategy(bt.Strategy):
         """
         self.index += 1
 
+        # Check if this is the last bar
+        if len(self) == len(self.data):
+            if self.getposition().size > 0:
+                self.log(f"Final bar reached. Selling all {self.getposition().size:.2f} units at {self.current_price}")
+                self.order = self.close()
+            return
+        
         # If an order is already pending, do not place new orders in this bar
         if self.order or self.emergency_exit_triggered:
             return

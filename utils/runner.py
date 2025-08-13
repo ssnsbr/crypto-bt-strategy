@@ -133,6 +133,7 @@ def run_backtest_for_df(df, coin_name,
         print(f'[RUN] Starting backtest for {coin_name} - Initial Portfolio Value: {cerebro.broker.getvalue():.2f}')
 
     results = cerebro.run()
+    cerebro.broker.close()
     strategy = results[0]
     print("[RUN] Cerebro Ended.")
 
