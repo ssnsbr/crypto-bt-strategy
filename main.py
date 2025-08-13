@@ -25,11 +25,12 @@ if __name__ == "__main__":
 
     folder_path = 'I:\\axiomchart\\'
     file_csv = "15s_axiom_chart_bars_Ekv9HdumWqnXZgq5G6ge6bk1ZRHKXYC2WnSFL94sQmLJ_1752166201266.csv"
+    folder_path = 'I:\\axiomchart\\1s\\'
 
     # List all CSV files
     csv_files = [folder_path + f for f in os.listdir(folder_path) if f.endswith('.csv')]
     print(f"Found {len(csv_files)} CSV files.", [len(pd.read_csv(csv_files[df_index])) for df_index in range(len(csv_files))])
-    df_index = 6
+    df_index = 3
 
     file_csv = csv_files[df_index]
     print(csv_files[df_index])

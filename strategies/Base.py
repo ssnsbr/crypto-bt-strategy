@@ -59,16 +59,16 @@ class BaseTradingStrategy(bt.Strategy):
         self.datalow = self.datas[0].low
         self.datavolume = self.datas[0].volume
         self.rsi = bt.indicators.RSI(self.datas[0].close, period=self.p.rsi_period)
-        self.sma60 = bt.indicators.SimpleMovingAverage(self.datas[0].close, period=60)
-        self.sma30 = bt.indicators.SimpleMovingAverage(self.datas[0].close, period=30)
-        self.sma15 = bt.indicators.SimpleMovingAverage(self.datas[0].close, period=15)
-        self.atr = bt.indicators.ATR(self.datas[0], period=self.p.atr_period)
-        self.bbands = bt.indicators.BollingerBands(self.dataclose,
-                                                   period=self.p.bb_period,
-                                                   devfactor=self.p.bb_devfactor)
+        # self.sma60 = bt.indicators.SimpleMovingAverage(self.datas[0].close, period=60)
+        # self.sma30 = bt.indicators.SimpleMovingAverage(self.datas[0].close, period=30)
+        # self.sma15 = bt.indicators.SimpleMovingAverage(self.datas[0].close, period=15)
+        # self.atr = bt.indicators.ATR(self.datas[0], period=self.p.atr_period)
+        # self.bbands = bt.indicators.BollingerBands(self.dataclose,
+        #                                            period=self.p.bb_period,
+        #                                            devfactor=self.p.bb_devfactor)
 
-        self.last_high = bt.indicators.Highest(self.datahigh, period=self.p.lookback_period)
-        self.last_low = bt.indicators.Lowest(self.datalow, period=self.p.lookback_period)
+        # self.last_high = bt.indicators.Highest(self.datahigh, period=self.p.lookback_period)
+        # self.last_low = bt.indicators.Lowest(self.datalow, period=self.p.lookback_period)
 
         # self.kama = bt.indicators.KAMA(self.datas[0])
 
@@ -219,6 +219,8 @@ class BaseTradingStrategy(bt.Strategy):
             self.order = self.close()
         return super().stop()
 
+    # def prenext(self): before indicators
+
     def next(self):
         """
         This method will be called for all remaining data points when the minimum period for all datas/indicators have been meet.
@@ -226,15 +228,17 @@ class BaseTradingStrategy(bt.Strategy):
         Handles migration, ATH tracking, green candle streak, stop loss,
         take profit, initial buy, and Fibo retracement buys.
         """
-        self.index += 1
+        self.index += 1  # starts after indicators
 
         # Check if this is the last bar
-        if len(self) == len(self.data):
+        # print(len(self),  (self._last()), len(self.dataclose))
+        if len(self) == self.data.buflen() - 1:
+            self.log(f"Final bar reached. at index {self.index}, bar {len(self)}.")
             if self.getposition().size > 0:
                 self.log(f"Final bar reached. Selling all {self.getposition().size:.2f} units at {self.current_price}")
                 self.order = self.close()
             return
-        
+
         # If an order is already pending, do not place new orders in this bar
         if self.order or self.emergency_exit_triggered:
             return
