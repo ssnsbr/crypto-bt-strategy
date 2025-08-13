@@ -126,6 +126,11 @@ class BaseTradingStrategy(bt.Strategy):
             if tmp < self.dead_coin_market_cap:
                 self.log(f"Announcing coin death at {self._format_value_for_log_mcap(current_price)}")
                 self.dead_coin = True
+                if self.getposition(self.datas[0]).size > 0:
+                    self.log(f'DEAD COIN EXIT! MarketCap {self._format_value_for_log_mcap(current_price)}, '
+                                  f'Selling all {self.getposition(self.datas[0]).size:.2f} units.')
+                    self.order = self.close()
+
 
     def green_candle_ok(self):
         return self.green_candle_streak >= self.p.green_candle_streak_required
