@@ -226,7 +226,10 @@ class BaseTradingStrategy(bt.Strategy):
         self.current_marketcap_str = self._format_value_for_log_mcap(self.current_price)
 
         self.catch_migration(self.current_price)
-        self.catch_dead_coin(self.current_price)
+        if self.dead_coin:
+            return
+        else:
+            self.catch_dead_coin(self.current_price)
 
         if not self.migrated:
             return
