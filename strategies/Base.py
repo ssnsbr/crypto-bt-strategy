@@ -128,9 +128,8 @@ class BaseTradingStrategy(bt.Strategy):
                 self.dead_coin = True
                 if self.getposition(self.datas[0]).size > 0:
                     self.log(f'DEAD COIN EXIT! MarketCap {self._format_value_for_log_mcap(current_price)}, '
-                                  f'Selling all {self.getposition(self.datas[0]).size:.2f} units.')
+                             f'Selling all {self.getposition(self.datas[0]).size:.2f} units.')
                     self.order = self.close()
-
 
     def green_candle_ok(self):
         return self.green_candle_streak >= self.p.green_candle_streak_required
@@ -212,6 +211,13 @@ class BaseTradingStrategy(bt.Strategy):
         # self.ath = 0.0 # Consider if ATH should be reset here or only when a new migration occurs
         # self.green_candle_streak = 0 # Consider if streak should be reset here
         self.log("Strategy state reset.")
+
+    def stop(self):
+        if self.getposition(self.datas[0]).size > 0:
+            self.log(f'AT END OF BACKTEST! MarketCap {self._format_value_for_log_mcap(self.current_price)}, '
+                     f'Selling all {self.getposition(self.datas[0]).size:.2f} units.')
+            self.order = self.close()
+        return super().stop()
 
     def next(self):
         """
