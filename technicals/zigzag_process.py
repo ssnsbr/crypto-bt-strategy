@@ -106,9 +106,21 @@ def pivot_changes(pdf):
     raw_changes_divided = (raw_changes / raw_changes.shift(1)).abs()
     pdf["pct_changes"] = pct_changes
     pdf["raw_changes"] = raw_changes
-    pdf["raw_changes_divided"] = raw_changes_divided
+
+    pdf["raw_retr"] = raw_changes_divided
+    pdf["pct_retr"] = (pct_changes / pct_changes.shift(1)).abs()
+
+    pdf["raw_ABC"] = (raw_changes / raw_changes.shift(2)).abs()
+    pdf["pct_ABC"] = (pct_changes / pct_changes.shift(2)).abs()
+
     pdf["time_len"] = pdf["pivot_timestamp"].diff() / 1000
     pdf["index_len"] = pdf["pivot_idx"].diff()
+
+    pdf["time_retr"] = (pdf["time_len"] / pdf["time_len"].shift(1)).abs()
+    pdf["index_retr"] = (pdf["index_len"] / pdf["index_len"].shift(1)).abs()
+
+    pdf["time_ABC"] = (pdf["time_len"] / pdf["time_len"].shift(2)).abs()
+    pdf["index_ABC"] = (pdf["index_len"] / pdf["index_len"].shift(2)).abs()
 
     pdf["time_index_ratio"] = pdf["index_len"] / pdf["time_len"]
 
