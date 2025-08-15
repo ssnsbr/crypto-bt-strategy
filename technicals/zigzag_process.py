@@ -89,7 +89,12 @@ def get_pivots(df, up_thresh=0.3, down_thresh=-0.3):
     timestamps = df.index  # assuming index is datetime
     # Calculate moving average of volume
     df['volume_ma_15'] = df['volume'].rolling(window=15).mean()
+    df['volume_ma_30'] = df['volume'].rolling(window=30).mean()
+    df['volume_ma_60'] = df['volume'].rolling(window=60).mean()
+
     df['rsi_14'] = calculate_rsi(df['close'], period=14).fillna(50)
+    df['rsi_30'] = calculate_rsi(df['close'], period=30).fillna(50)
+    df['rsi_60'] = calculate_rsi(df['close'], period=60).fillna(50)
 
     pivots = peak_valley_pivots(prices, up_thresh=up_thresh, down_thresh=down_thresh)
     # pivot_indices, pivot_prices, pct_changes, relative_changes = zigzag_percent_changes(prices, 0.1)
@@ -104,6 +109,15 @@ def get_pivots(df, up_thresh=0.3, down_thresh=-0.3):
     pivot_prices = prices[pivot_indices]
     pivot_timestamp = df["timestamp"].values[pivot_indices]
     pivot_times = df["datetime"].values[pivot_indices]
+
+    pdf["rsi_14"] = df["rsi_14"].values[pivot_indices]
+    pdf["rsi_30"] = df["rsi_30"].values[pivot_indices]
+    pdf["rsi_60"] = df["rsi_60"].values[pivot_indices]
+
+    pdf["volume_ma_15"] = df["volume_ma_15"].values[pivot_indices]
+    pdf["volume_ma_30"] = df["volume_ma_30"].values[pivot_indices]
+    pdf["volume_ma_60"] = df["volume_ma_60"].values[pivot_indices]
+
     # Example data
     pdf["pivot_idx"] = pivot_indices
     # pdf["pivot_idx"] = df.index[pivot_indices]
