@@ -68,13 +68,28 @@ def zigzag_percent_changes(prices, percent_threshold=0.3):
     return pivot_idxs, pivot_prices, pct_changes, relative_changes
 
 
+def calculate_rsi(series, period=14):
+    delta = series.diff()
+    gain = delta.where(delta > 0, 0)
+    loss = -delta.where(delta < 0, 0)
+
+    avg_gain = gain.rolling(window=period).mean()
+    avg_loss = loss.rolling(window=period).mean()
+
+    rs = avg_gain / avg_loss
+    rsi = 100 - (100 / (1 + rs))
+
+    return rsi
+
+
 def get_pivots(df, up_thresh=0.3, down_thresh=-0.3):
     # Example: your price series
     # prices = pd.read_csv(df)['close'].values
     prices = df['close'].values
     timestamps = df.index  # assuming index is datetime
-
-    # Detect pivots (e.g., require ±30% move to switch trend)
+    # Calculate moving average of volume
+    df['volume_ma_15'] = df['volume'].rolling(window=15).mean()
+    df['rsi_14'] = calculate_rsi(df['close'], period=14).fillna(50)
 
     pivots = peak_valley_pivots(prices, up_thresh=up_thresh, down_thresh=down_thresh)
     # pivot_indices, pivot_prices, pct_changes, relative_changes = zigzag_percent_changes(prices, 0.1)
@@ -103,11 +118,11 @@ def pivot_changes(pdf):
     pivot_prices = pdf["pivot_prices"]
     pct_changes = pivot_prices.pct_change() * 100
     raw_changes = pivot_prices.diff()
-    raw_changes_divided = (raw_changes / raw_changes.shift(1)).abs()
+    raw_changes_ratio = (raw_changes / raw_changes.shift(1)).abs()
     pdf["pct_changes"] = pct_changes
     pdf["raw_changes"] = raw_changes
 
-    pdf["raw_retr"] = raw_changes_divided
+    pdf["raw_retr"] = raw_changes_ratio
     pdf["pct_retr"] = (pct_changes / pct_changes.shift(1)).abs()
 
     pdf["raw_ABC"] = (raw_changes / raw_changes.shift(2)).abs()
@@ -145,7 +160,7 @@ def plot_pivot_1(df, pdf):
     pivot_prices = pdf["pivot_prices"]
     pivot_idx = pdf["pivot_idx"]
     pct_changes = pdf["pct_changes"]
-    relative_changes = pdf["raw_changes_divided"]
+    relative_changes = pdf["raw_changes_ratio"]
     ath_rel = pdf["ath_rel"]
 
     migration_price = 70_000
@@ -223,8 +238,8 @@ def ath_rel(pdf):
     pdf["age_ath_rel"] = pdf["pivot_timestamp"] - ath_timestamp
     pdf["age_ath_rel"] = (pdf["age_ath_rel"] / 1000).abs()
 
-    pdf["age_ath_rel_by_idx"] = pdf.index - ath_index
-    pdf["age_ath_rel_by_idx"] = pdf["age_ath_rel_by_idx"].abs()
+    pdf["ath_to_dis"] = pdf.index - ath_index
+    pdf["ath_to_dis"] = pdf["ath_to_dis"].abs()
 
     return pdf
 
@@ -276,7 +291,7 @@ def ready_df(df_input, mcap=False):  # Renamed df to df_input to avoid conflict 
     return df_input
 
 
-def main(df_file, log=False, draw=False, up_thresh=0.4, down_thresh=-0.4):
+def main(df_file, log=False, draw=False, log_custom_print=False, up_thresh=0.4, down_thresh=-0.4):
     df, pdf = get_pivots(ready_df(pd.read_csv(df_file), True), up_thresh=up_thresh, down_thresh=down_thresh)
     pivot_indices = pdf["pivot_idx"]
     pivot_prices = pdf["pivot_prices"]
@@ -284,14 +299,15 @@ def main(df_file, log=False, draw=False, up_thresh=0.4, down_thresh=-0.4):
     pdf = ath_rel(pdf)
     pdf = pivot_changes(pdf)
     pdf = after_migration(pdf)
-    pdf["next_wave_pct_changes"] = pdf["pct_changes"].shift(-1)
+    pdf["next_wave_pct"] = pdf["pct_changes"].shift(-1)
     # relative_changes = get_relative_changes(pdf)
     # pdf["relative_changes"] = relative_changes
-    custom_print(pdf)
+    if log_custom_print:
+        custom_print(pdf)
     pdf["sort_index"] = pdf.index
 
-    # pdf["after_before_ration"] = pdf["pct_changes"] / pdf["next_wave_pct_changes"] * -1
-    pdf["before_after_pct_ratio"] = pdf["next_wave_pct_changes"] / pdf["pct_changes"] * -1
+    # pdf["after_before_ration"] = pdf["pct_changes"] / pdf["next_wave_pct"] * -1
+    pdf["bef_aft_pct_ratio"] = pdf["next_wave_pct"] / pdf["pct_changes"] * -1
 
     pdf["name"] = os.path.basename(df_file)
 
@@ -307,7 +323,8 @@ def main(df_file, log=False, draw=False, up_thresh=0.4, down_thresh=-0.4):
 def make_save_pdf(csv_files_1s, output_folder='/content/drive/MyDrive/charts/1s_pivots/'):
     os.makedirs(output_folder, exist_ok=True)
     for i, path in enumerate(csv_files_1s):
-        print(i, "of", len(csv_files_1s))
+        if i % 50 == 0:
+            print(i, "of", len(csv_files_1s))
         try:
             pdf = main(path)
             name = os.path.basename(path).replace(".csv", "_pdf.csv")
@@ -320,7 +337,8 @@ def read_concat_pdf(pdfs_folder='/content/drive/MyDrive/charts/1s_pivots/', full
     csv_files_pdf = [pdfs_folder + f for f in os.listdir(pdfs_folder) if f.endswith('.csv')]
     all_pdfs = []
     for i, path in enumerate(csv_files_pdf):
-        print(i, "of", len(csv_files_pdf))
+        if i % 50 == 0:
+            print(i, "of", len(csv_files_pdf))
         try:
             pdf = pd.read_csv(path)
             all_pdfs.append(pdf)
@@ -337,7 +355,7 @@ def make_save_all(csv_files_1s, full_save_path="/content/drive/MyDrive/charts/al
     all_pdfs = []
 
     for i, path in enumerate(csv_files_1s):
-        if i % 20 == 0:
+        if i % 50 == 0:
             print(i, "of", len(csv_files_1s))
         try:
             pdf = main(path)
