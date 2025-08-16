@@ -249,11 +249,17 @@ def ath_rel(pdf):
     pdf["age"] = pdf["pivot_timestamp"] - start_timestamp
     pdf["age"] = pdf["age"] / 1000
     ath_timestamp = pdf["pivot_timestamp"].values[ath_index]
-    pdf["age_ath_rel"] = pdf["pivot_timestamp"] - ath_timestamp
-    pdf["age_ath_rel"] = (pdf["age_ath_rel"] / 1000).abs()
+    pdf["time_to_ath"] = pdf["pivot_timestamp"] - ath_timestamp
+    pdf["time_to_ath"] = (pdf["time_to_ath"] / 1000).abs()
 
-    pdf["ath_to_dis"] = pdf.index - ath_index
-    pdf["ath_to_dis"] = pdf["ath_to_dis"].abs()
+    pdf["idx_to_ath"] = pdf.index - ath_index
+    pdf["idx_to_ath"] = pdf["idx_to_ath"].abs()
+
+    start_to_ath_time = pdf["time_to_ath"].values[0]
+    pdf["time_to_ath_ratio"] = pdf["time_to_ath"] / start_to_ath_time
+
+    start_to_ath_idx = pdf["idx_to_ath"].values[0]
+    pdf["idx_to_ath_ratio"] = pdf["idx_to_ath"] / start_to_ath_idx
 
     return pdf
 
@@ -281,8 +287,9 @@ def custom_print(pdf):
     print(get_means(pdf[:ath_index]["pct_changes"]), "**ATH**", get_means(pdf[ath_index:]["pct_changes"]))
 
 
-def ready_df(df_input, mcap=False):  # Renamed df to df_input to avoid conflict with local variable
-    print("Preparing dataframe with size ", len(df_input))
+def ready_df(df_input, mcap=False, log=False):  # Renamed df to df_input to avoid conflict with local variable
+    if log:
+        print("Preparing dataframe with size ", len(df_input))
     df_input["timestamp"] = df_input["time"]  # Assuming original 'time' is the ms timestamp
     df_input['time'] = pd.to_datetime(df_input['timestamp'], unit='ms')
 
@@ -306,7 +313,7 @@ def ready_df(df_input, mcap=False):  # Renamed df to df_input to avoid conflict 
 
 
 def main(df_file, log=False, draw=False, log_custom_print=False, up_thresh=0.4, down_thresh=-0.4):
-    df, pdf = get_pivots(ready_df(pd.read_csv(df_file), True), up_thresh=up_thresh, down_thresh=down_thresh)
+    df, pdf = get_pivots(ready_df(pd.read_csv(df_file), True, log), up_thresh=up_thresh, down_thresh=down_thresh)
     pivot_indices = pdf["pivot_idx"]
     pivot_prices = pdf["pivot_prices"]
     pivot_idx = pdf["pivot_idx"]
