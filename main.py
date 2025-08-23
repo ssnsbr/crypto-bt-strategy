@@ -72,7 +72,7 @@ if __name__ == "__main__":
     #     "data_in_market_cap": mcap,
     #     "log": sizer_log
     # }
-    # sizer_class = bt.sizers.PercentSizer
+    sizer_class = bt.sizers.PercentSizer
     sizer_params = None
     all_results_df, all_cerebros_objects, all_portfolio_histories = run_all([file_csv],
                                                                             sizer_class=sizer_class,

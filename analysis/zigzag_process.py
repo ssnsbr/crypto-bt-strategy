@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 # from ..utils.utils import format_marketcap
 # from utils.utils import format_marketcap
-from zigzag import *
+# from zigzag import *
 # from utils.data_utils import ready_df
 
 
@@ -119,8 +119,8 @@ def get_pivots(df, up_thresh=0.3, down_thresh=-0.3):
     pdf["volume_ma_60"] = df["volume_ma_60"].values[pivot_indices]
 
     # Example data
-    pdf["pivot_idx"] = pivot_indices
-    # pdf["pivot_idx"] = df.index[pivot_indices]
+    pdf["candle_idx"] = pivot_indices
+    # pdf["candle_idx"] = df.index[pivot_indices]
     pdf["pivot_prices"] = pivot_prices
     pdf["pivot_times"] = pivot_times
     pdf["pivot_timestamp"] = pivot_timestamp
@@ -143,7 +143,7 @@ def pivot_changes(pdf):
     pdf["pct_ABC"] = (pct_changes / pct_changes.shift(2)).abs()
 
     pdf["time_len"] = pdf["pivot_timestamp"].diff() / 1000
-    pdf["index_len"] = pdf["pivot_idx"].diff()
+    pdf["index_len"] = pdf["candle_idx"].diff()
 
     pdf["time_retr"] = (pdf["time_len"] / pdf["time_len"].shift(1)).abs()
     pdf["index_retr"] = (pdf["index_len"] / pdf["index_len"].shift(1)).abs()
@@ -172,7 +172,7 @@ def get_relative_changes(pdf):
 
 def plot_pivot_1(df, pdf):
     pivot_prices = pdf["pivot_prices"]
-    pivot_idx = pdf["pivot_idx"]
+    candle_idx = pdf["candle_idx"]
     pct_changes = pdf["pct_changes"]
     relative_changes = pdf["raw_changes_ratio"]
     ath_rel = pdf["ath_rel"]
@@ -186,7 +186,7 @@ def plot_pivot_1(df, pdf):
     timestamps = df.index
     plt.figure(figsize=(14, 6))
     plt.plot(timestamps, df["close"], label='Price', alpha=0.6)
-    plt.plot(pivot_idx, pivot_prices, 'ro-', label='ZigZag Pivots')
+    plt.plot(candle_idx, pivot_prices, 'ro-', label='ZigZag Pivots')
     plt.plot(first_migration_time, migration_value, 'mo')  # magenta dot
     # plt.axvline(first_migration_time, color='purple', linestyle='--', alpha=0.6, label='Migration >70K')
     plt.annotate("Migration\n>70K",
@@ -200,7 +200,7 @@ def plot_pivot_1(df, pdf):
 
     # Add labels with both % values
     for i in range(1, len(pivot_prices)):
-        x = pivot_idx[i]
+        x = candle_idx[i]
         y = pivot_prices[i]
         abs_pct = pct_changes[i]
         rel_pct = relative_changes[i] if i < len(relative_changes) else np.nan
@@ -314,9 +314,9 @@ def ready_df(df_input, mcap=False, log=False):  # Renamed df to df_input to avoi
 
 def main(df_file, log=False, draw=False, log_custom_print=False, up_thresh=0.4, down_thresh=-0.4):
     df, pdf = get_pivots(ready_df(pd.read_csv(df_file), True, log), up_thresh=up_thresh, down_thresh=down_thresh)
-    pivot_indices = pdf["pivot_idx"]
+    pivot_indices = pdf["candle_idx"]
     pivot_prices = pdf["pivot_prices"]
-    pivot_idx = pdf["pivot_idx"]
+    candle_idx = pdf["candle_idx"]
     pdf = ath_rel(pdf)
     pdf = pivot_changes(pdf)
     pdf = after_migration(pdf)

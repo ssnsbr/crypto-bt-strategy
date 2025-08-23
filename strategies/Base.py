@@ -13,6 +13,8 @@ class BaseTradingStrategy(bt.Strategy):
         ('green_candle_streak_required', 2),
         ('data_in_market_cap', False),
         ('log', True),
+        ('dead_coin_market_cap', 8_000),
+        ('migration_market_cap', 70_000),
 
         # Exit Strategy Enable/Disable Flags (with defaults)
         ('enable_emergency_exit', True),
@@ -88,8 +90,6 @@ class BaseTradingStrategy(bt.Strategy):
         self.ath_update_thrshld = 1.05
         self.green_candle_streak = 0
 
-        self.migration_market_cap = 70_000
-        self.dead_coin_market_cap = 15_000
         self.dead_coin = False
         self.emergency_exit_triggered = False
         self.old_cash = 0
@@ -118,14 +118,14 @@ class BaseTradingStrategy(bt.Strategy):
         if self.migrated:
             return
         tmp = current_price if self.p.data_in_market_cap else current_price * 1_000_000_000
-        if tmp > self.migration_market_cap:
+        if tmp > self.p.migration_market_cap:
             self.migrated = True
             self.log(f"Migration threshold crossed at {self._format_value_for_log_mcap(current_price)}")
 
     def catch_dead_coin(self, current_price):
         if self.migrated:  # Only check for dead coin after migration
             tmp = current_price if self.p.data_in_market_cap else current_price * 1_000_000_000
-            if tmp < self.dead_coin_market_cap:
+            if tmp < self.p.dead_coin_market_cap:
                 self.log(f"Announcing coin death at {self._format_value_for_log_mcap(current_price)}")
                 self.dead_coin = True
                 if self.getposition(self.datas[0]).size > 0:
