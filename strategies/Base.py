@@ -175,6 +175,9 @@ class BaseTradingStrategy(bt.Strategy):
             pnl_net = trade.pnlcomm / 1_000_000_000 if self.p.data_in_market_cap else trade.pnlcomm
             self.log(f'TRADE PNL, Gross {pnl_gross:.6f}, Net {pnl_net:.6f}')
 
+        if hasattr(self, 'sizer') and hasattr(self.sizer, 'notify_trade'):
+            self.sizer.notify_trade(trade)
+
     def notify_cashvalue(self, cash, value):
         if cash != self.old_cash:
             self.log(f"Change in cash/value cash:{self.cash_when_mcap(cash):.6f} ,value:{self.cash_when_mcap(value):.6f}")

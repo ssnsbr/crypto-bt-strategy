@@ -9,7 +9,7 @@ def format_marketcap(marketcap):
     Calculates market cap and formats it to K or M.
     """
     if marketcap >= 1_000_000_000:  # Billions
-        return f"{marketcap / 1_000_000_000:.2f}B!"
+        return f"{marketcap / 1_000_000_000:.2f}B"
     elif marketcap >= 1_000_000:  # Millions
         return f"{marketcap / 1_000_000:.2f}M"
     elif marketcap >= 1_000:  # Thousands
