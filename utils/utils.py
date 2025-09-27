@@ -1,3 +1,33 @@
+from datetime import datetime
+
+
+def getstring(dic):
+    ret = ""
+    for p, v in dic.items():  # Changed from strategy_params to dic
+        if isinstance(v, int) and v > 1000:  # Fixed type checking
+            ret = ret + "_" + str(p) + "-" + format_marketcap(v)
+        else:
+            ret = ret + "_" + str(p) + "-" + str(v)
+    return ret
+
+
+def get_name(strategy_class, strategy_params, sizer_class, sizer_params, len_file):
+    date_str = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")  # or "%Y%m%d_%H%M%S" if you want timestamp
+    naming = [strategy_class.__name__, sizer_class.__name__, date_str, "len-" + str(len_file)]
+    # Detail string (longer version, readable)
+    details = {
+        "strategy": strategy_class.__name__,
+        "strategy_params": strategy_params,
+        "sizer": sizer_class.__name__,
+        "sizer_params": sizer_params,
+        "time": date_str,
+        "len": len_file,
+    }
+    name = "_".join(naming)
+    # detail = "_".join(details)
+
+    return name, details
+
 
 def format_price_to_marketcap(price):
     marketcap = price * 1_000_000_000
