@@ -136,6 +136,15 @@ def run_backtest_for_df(df, coin_name,
     strategy = results[0]
     print("[RUN] Cerebro Ended.")
 
+    martingale_cycles_df = None
+    # Save martingale cycles if available
+    if hasattr(strategy, "martingale_cycles") and strategy.martingale_cycles:
+        martingale_cycles_df = pd.DataFrame(strategy.martingale_cycles)
+        # outdir = "backtest_results/martingale_cycles"
+        # os.makedirs(outdir, exist_ok=True)
+        # martingale_cycles_df.to_csv(f"{outdir}/{coin_name}_cycles.csv", index=False)
+        # print(f"[RUN] Saved {len(martingale_cycles_df)} martingale cycles to {coin_name}_cycles.csv")
+
     final_portfolio_value = cerebro.broker.getvalue()
     if mcap:
         final_portfolio_value = final_portfolio_value / 1_000_000_000
@@ -185,7 +194,7 @@ def run_backtest_for_df(df, coin_name,
         result_list_of_lists = combined_array.tolist()
         print("[RUN] Full History:", result_list_of_lists)
 
-    return analysis_results, cerebro, cash_history_series
+    return analysis_results, cerebro, cash_history_series, martingale_cycles_df
 
 
 def run_all(csv_files,
@@ -196,7 +205,8 @@ def run_all(csv_files,
             strategy_params=None,
             mcap=False,
             df_start_margin=0,
-            df_end_margin=-1
+            df_end_margin=-1,
+            after_ath=False
             ):
     """
     Runs backtests for multiple coin dataframes and aggregates results.
@@ -218,20 +228,25 @@ def run_all(csv_files,
         df = ready_df(df, mcap=mcap)
         coin_name = os.path.basename(csv_file).split('.')[0][17:27]  # Assuming coin name is the filename without extension
 
+        if (after_ath):
+            ath_index = df["close"].idxmax()
+            # ath = df["close"].max()
+            df.loc[ath_index + 1:]
+
         analysis_result, cerebro_obj, portfolio_history_series = run_backtest_for_df(
-                df[df_start_margin:df_end_margin],
-                coin_name=coin_name,
-                strategy_class=strategy_class,
-                cash=cash,
-                sizer_class=sizer_class,
-                strategy_params=strategy_params,
-                mcap=mcap,
-                commission_class=CustomSolanaCommission,
-                sizer_params=sizer_params)
+            df[df_start_margin:df_end_margin],
+            coin_name=coin_name,
+            strategy_class=strategy_class,
+            cash=cash,
+            sizer_class=sizer_class,
+            strategy_params=strategy_params,
+            mcap=mcap,
+            commission_class=CustomSolanaCommission,
+            sizer_params=sizer_params)
         all_results.append(analysis_result)
         all_cerebros[coin_name] = cerebro_obj
         all_portfolio_histories[coin_name] = portfolio_history_series
-            
+
         # try:
         #     analysis_result, cerebro_obj, portfolio_history_series = run_backtest_for_df(
         #         df[df_start_margin:df_end_margin],
