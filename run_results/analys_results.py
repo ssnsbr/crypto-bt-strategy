@@ -152,12 +152,21 @@ def analys_trades(df, name=""):
         name + "time_won_avg": df["time_won_avg"].mean() if "time_won_avg" in df and not df["time_won_avg"].empty else 0,
         name + "time_lost_avg": df["time_lost_avg"].mean() if "time_lost_avg" in df and not df["time_lost_avg"].empty else 0,
         #
-        name + "InitBuy": df["ib_count"].iloc[0] if "ib_count" in df and not df["ib_count"].empty else 0,
-        name + "TP_count": df["tp_count"].iloc[0] if "tp_count" in df and not df["tp_count"].empty else 0,
-        name + "SL_count": df["sl_count"].iloc[0] if "sl_count" in df and not df["sl_count"].empty else 0,
-        name + "BA_round_count": df["ba_round_count"].iloc[0] if "ba_round_count" in df and not df["ba_round_count"].empty else 0,
-        name + "BA_count": df["ba_count"].iloc[0] if "ba_count" in df and not df["ba_count"].empty else 0,
-        name + "Counter_list": df["counter_list"].iloc[0] if "counter_list" in df and not df["counter_list"].empty else [],
+        name + "mean_InitBuy": df["ib_count"].mean() if "ib_count" in df and not df["ib_count"].empty else 0,
+        name + "mean_TP_count": df["tp_count"].mean() if "tp_count" in df and not df["tp_count"].empty else 0,
+        name + "mean_SL_count": df["sl_count"].mean() if "sl_count" in df and not df["sl_count"].empty else 0,
+        name + "mean_BA_round_count": df["ba_round_count"].mean() if "ba_round_count" in df and not df["ba_round_count"].empty else 0,
+        name + "mean_BA_count": df["ba_count"].mean() if "ba_count" in df and not df["ba_count"].empty else 0,
+        # name + "Counter_list": df["counter_list"].iloc[0] if "counter_list" in df and not df["counter_list"].empty else [],
+        #
+        name + "sum_InitBuy": df["ib_count"].sum() if "ib_count" in df and not df["ib_count"].empty else 0,
+        name + "sum_TP_count": df["tp_count"].sum() if "tp_count" in df and not df["tp_count"].empty else 0,
+        name + "sum_SL_count": df["sl_count"].sum() if "sl_count" in df and not df["sl_count"].empty else 0,
+        name + "sum_BA_round_count": df["ba_round_count"].sum() if "ba_round_count" in df and not df["ba_round_count"].empty else 0,
+        name + "sum_BA_count": df["ba_count"].sum() if "ba_count" in df and not df["ba_count"].empty else 0,
+        # name + "Counter_list": df["counter_list"].iloc[0] if "counter_list" in df and not df["counter_list"].empty else [],
+        #
+
 
     }
 
