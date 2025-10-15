@@ -4,6 +4,7 @@ import os
 
 
 def read_analysers(strategy):
+    """ For each token, This happens after run to collect data from analyzers """
     sharpe_ratio = strategy.analyzers.mysharpe.get_analysis().get('sharperatio', 'N/A')
     drawdown_data = strategy.analyzers.mydrawdown.get_analysis().get('max', {})
     trade_data = strategy.analyzers.mytradeanalyzer.get_analysis()
@@ -113,6 +114,13 @@ def read_analysers(strategy):
         'trade_duration_std': duration_data.get('std', 0),
         'trade_duration_count': duration_data.get('count', 0),
     }
+    # counter_data:
+    # [RUN]  ib_count 0
+    # [RUN]  tp_count 0
+    # [RUN]  sl_count 0
+    # [RUN]  ba_round_count 0
+    # [RUN]  ba_count 0
+    # [RUN]  counter_list []
     return analysis_results | counter_data
 
 
@@ -138,7 +146,19 @@ def analys_trades(df, name=""):
         name + 'max_pnl%': pnl_perc_stats['max'],
         name + 'min_pnl%': pnl_perc_stats['min'],
         name + 'std_pnl%': pnl_perc_stats['std'],
-        name + 'median_pnl%': pnl_perc_stats['50%']
+        name + 'median_pnl%': pnl_perc_stats['50%'],
+        #
+        "time_average": df["time_average"].mean() if "time_average" in df and not df["time_average"].empty else 0,
+        "time_won_avg": df["time_won_avg"].mean() if "time_won_avg" in df and not df["time_won_avg"].empty else 0,
+        "time_lost_avg": df["time_lost_avg"].mean() if "time_lost_avg" in df and not df["time_lost_avg"].empty else 0,
+        #
+        "InitBuy": df["ib_count"].iloc[0] if "ib_count" in df and not df["ib_count"].empty else 0,
+        "TP_count": df["tp_count"].iloc[0] if "tp_count" in df and not df["tp_count"].empty else 0,
+        "SL_count": df["sl_count"].iloc[0] if "sl_count" in df and not df["sl_count"].empty else 0,
+        "BA_round_count": df["ba_round_count"].iloc[0] if "ba_round_count" in df and not df["ba_round_count"].empty else 0,
+        "BA_count": df["ba_count"].iloc[0] if "ba_count" in df and not df["ba_count"].empty else 0,
+        "Counter_list": df["counter_list"].iloc[0] if "counter_list" in df and not df["counter_list"].empty else [],
+
     }
 
 
@@ -223,7 +243,7 @@ def analys(dfname):
     }
     r2 = {
         "geo_mean_return": geometric_mean(all_results_df["pnl%"]),
-        "trimmed_mean_5pct": trimmed_mean(all_results_df["pnl%"], 0.075),
+        "trimmed_mean_5pct": trimmed_mean(all_results_df["pnl%"], 0.03),
         "median": np.median(all_results_df["pnl%"]),
         "p25": np.percentile(all_results_df["pnl%"], 25),
         "p75": np.percentile(all_results_df["pnl%"], 75),

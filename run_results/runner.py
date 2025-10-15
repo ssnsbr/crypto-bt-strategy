@@ -260,7 +260,7 @@ def run_all(csv_files,
     return results_df, all_cerebros, all_portfolio_histories
 
 
-def run_and_save(file_to_run, sizer_class, strategy_class, strategy_params, sizer_params, results_folder, cash=100, mcap=True):
+def run_and_save(file_to_run, sizer_class, strategy_class, strategy_params, sizer_params, results_folder='/content/drive/MyDrive/charts/results/', cash=100, mcap=True, after_ath=False):
     name, detail = get_name(strategy_class, strategy_params, sizer_class, sizer_params, len(file_to_run))
     full_save_name = name + "_memes.csv"
     full_detail_name = "details_" + name + "_details.txt"
@@ -274,7 +274,7 @@ def run_and_save(file_to_run, sizer_class, strategy_class, strategy_params, size
                                                                             cash=cash,
                                                                             mcap=mcap,
                                                                             df_start_margin=2,
-                                                                            after_ath=True
+                                                                            after_ath=after_ath
                                                                             )
 
     df_save_path = results_folder + full_save_name
