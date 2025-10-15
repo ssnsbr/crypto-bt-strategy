@@ -74,13 +74,17 @@ class MartingaleSizer(bt.Sizer):
                 self.log(f"[Sizer] Selling all {position.size:.2f} units")
             return position.size
 
+from strategies.Base import BaseTradingStrategy
+import backtrader as bt
+from riskmanagers.NoneRiskManagement import NoneRiskManagement
+
 
 class BaseBuySell20_30(BaseTradingStrategy):
 
     params = (
         ('log', True),
         ('tp', 1.2),                # Take profit at 120% of avg price
-        ('sl', 0.7),
+        ('sl', 0.6),
         ('buy_again', 0.7),         # Buy again at 70% of avg/last price
         ('max_buy_count', 6),
         ('end_mcap', 20_000),
@@ -132,7 +136,7 @@ class BaseBuySell20_30(BaseTradingStrategy):
     def stop(self):
         """Called once at the end of the strategy"""
         print(
-            f"Strategy End  | InitBuy: {self.ib_count} | TP: {self.tp_count} | SL: {self.sl_count} | BuyAgain: {self.ba_round_count}  | BuyAgainAll:{self.ba_count} | self.counter_list: {self.counter_list}")
+            f"Strategy End  | InitBuy: {self.ib_count} | TP: {self.tp_count} | SL: {self.sl_count} | BuyAgain: {self.ba_round_count}  | BuyAgainAll:{self.ba_count} | self.counter_list: len={len(self.counter_list)} list= {self.counter_list}")
 
     def init_buy(self):
         self.log(f'Initial BUY: Attempting at {self.current_marketcap_str}')
@@ -149,7 +153,7 @@ class BaseBuySell20_30(BaseTradingStrategy):
         self.just_bought_index = self.index
         self.buy_counter += 1
         self.ba_count += 1
-        if self.buy_counter == 1:
+        if self.buy_counter == 2:
             self.ba_round_count += 1
 
     def sell_tp(self):
@@ -213,6 +217,7 @@ class BaseBuySell20_30(BaseTradingStrategy):
             self.order = self.close()
             self.done = True
             return
+
 
 # ***
 ####

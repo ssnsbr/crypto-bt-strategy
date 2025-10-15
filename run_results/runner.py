@@ -1,32 +1,17 @@
+import json
+import pickle
 import pandas as pd
 import numpy as np
 import os
 
 import backtrader as bt
 from commissions.CustomSolanaCommission import CustomSolanaCommission
+from run_results.analys_results import read_analysers
+from run_results.custom_analyzers import BACounterAnalyzer, CashHistoryAnalyzer, TradeDurationAnalyzer
 from sizers.FiboMartingaleSizer import FiboMartingaleSizer
 from strategies import FiboMartingaleStrategy
 from utils.data_utils import ready_df
-
-
-class CashHistoryAnalyzer(bt.Analyzer):
-    """
-    An analyzer to record the cash balance at each bar.
-    """
-
-    def __init__(self):
-        self.cash_history = {}
-
-    def next(self):
-        # Record cash at the end of each bar
-        # self.data.datetime[0] gives the date of the current bar (as a float)
-        # self.strategy.broker.getcash() gives the current cash balance
-        dt = self.strategy.data.datetime.datetime(0)  # Get the current bar's datetime object
-        self.cash_history[dt] = self.strategy.broker.getcash()
-
-    def get_analysis(self):
-        # Return the dictionary of cash history
-        return self.cash_history
+from utils.utils import get_name
 
 
 def _configure_cerebro(
@@ -81,6 +66,20 @@ def _configure_cerebro(
     cerebro.addanalyzer(bt.analyzers.Returns, _name='myreturns')
     cerebro.addanalyzer(bt.analyzers.PositionsValue, _name='mypositionsvalue')  # To get portfolio history
     cerebro.addanalyzer(CashHistoryAnalyzer, _name='mycashvalue')         # To get CASH history
+    cerebro.addanalyzer(bt.analyzers.SQN, _name='mysqn')
+    cerebro.addanalyzer(bt.analyzers.Transactions, _name='mytransactions')
+    cerebro.addanalyzer(bt.analyzers.VWR, _name='myvwr')
+    cerebro.addanalyzer(bt.analyzers.PyFolio, _name='mypyfolio')
+    cerebro.addanalyzer(bt.analyzers.TimeReturn, _name='timereturns')
+    cerebro.addanalyzer(bt.analyzers.AnnualReturn, _name='annualreturn')
+    cerebro.addanalyzer(bt.analyzers.PeriodStats, _name='periodstats')
+    # cerebro.addanalyzer(bt.analyzers.Exposure, _name='exposure')
+    cerebro.addanalyzer(bt.analyzers.GrossLeverage, _name='leverage')
+    cerebro.addanalyzer(bt.analyzers.SharpeRatio_A, _name='sharpe_annual')
+    # cerebro.addanalyzer(bt.analyzers.SortinoRatio, _name='sortino')
+    cerebro.addanalyzer(bt.analyzers.Calmar, _name='calmar')
+    cerebro.addanalyzer(TradeDurationAnalyzer, _name='mytradeduration')
+    cerebro.addanalyzer(BACounterAnalyzer, _name='mybacounteranalyzer')
 
     # Add observers (for plotting later)
     cerebro.addobserver(bt.observers.Broker)
@@ -136,32 +135,19 @@ def run_backtest_for_df(df, coin_name,
     strategy = results[0]
     print("[RUN] Cerebro Ended.")
 
-    martingale_cycles_df = None
-    # Save martingale cycles if available
-    if hasattr(strategy, "martingale_cycles") and strategy.martingale_cycles:
-        martingale_cycles_df = pd.DataFrame(strategy.martingale_cycles)
-        # outdir = "backtest_results/martingale_cycles"
-        # os.makedirs(outdir, exist_ok=True)
-        # martingale_cycles_df.to_csv(f"{outdir}/{coin_name}_cycles.csv", index=False)
-        # print(f"[RUN] Saved {len(martingale_cycles_df)} martingale cycles to {coin_name}_cycles.csv")
-
     final_portfolio_value = cerebro.broker.getvalue()
     if mcap:
         final_portfolio_value = final_portfolio_value / 1_000_000_000
     print(f'[RUN] Final Portfolio Value for {coin_name}: {final_portfolio_value:.2f}')
-
+    # Extract analysis results safely (with default fallbacks)
     # Extract analysis results
     analysis_results = {
         'coin': coin_name,
         'start_value': cash,
         'final_value': final_portfolio_value,
-        'sharpe_ratio': strategy.analyzers.mysharpe.get_analysis().get('sharperatio', 'N/A'),
-        'max_drawdown': strategy.analyzers.mydrawdown.get_analysis().get('max', {}).get('drawdown', 'N/A'),
-        'total_trades': strategy.analyzers.mytradeanalyzer.get_analysis().get('total', {}).get('closed', 0),
-        'winning_trades': strategy.analyzers.mytradeanalyzer.get_analysis().get('won', {}).get('total', 0),
-        'losing_trades': strategy.analyzers.mytradeanalyzer.get_analysis().get('lost', {}).get('total', 0),
-        'annualized_return': strategy.analyzers.myreturns.get_analysis().get('rnorm100', 'N/A')
     }
+    a_r = read_analysers(strategy)
+    analysis_results = analysis_results | a_r
     print('Analyze:')
     for k, v in analysis_results.items():
         print("[RUN] ", k, v)
@@ -194,7 +180,7 @@ def run_backtest_for_df(df, coin_name,
         result_list_of_lists = combined_array.tolist()
         print("[RUN] Full History:", result_list_of_lists)
 
-    return analysis_results, cerebro, cash_history_series, martingale_cycles_df
+    return analysis_results, cerebro, cash_history_series
 
 
 def run_all(csv_files,
@@ -230,9 +216,10 @@ def run_all(csv_files,
 
         if (after_ath):
             ath_index = df["close"].idxmax()
-            # ath = df["close"].max()
-            df.loc[ath_index + 1:]
-
+            ath = df["close"].max()
+            print("ATH is ", ath, " at index ", ath_index, " of ", len(df))
+            df = df.loc[ath_index + 1:]
+            print("After ATH len:", len(df))
         analysis_result, cerebro_obj, portfolio_history_series = run_backtest_for_df(
             df[df_start_margin:df_end_margin],
             coin_name=coin_name,
@@ -271,3 +258,37 @@ def run_all(csv_files,
 
     results_df = pd.DataFrame(all_results)
     return results_df, all_cerebros, all_portfolio_histories
+
+
+def run_and_save(file_to_run, sizer_class, strategy_class, strategy_params, sizer_params, results_folder, cash=100, mcap=True):
+    name, detail = get_name(strategy_class, strategy_params, sizer_class, sizer_params, len(file_to_run))
+    full_save_name = name + "_memes.csv"
+    full_detail_name = "details_" + name + "_details.txt"
+
+    print(name, detail)
+    all_results_df, all_cerebros_objects, all_portfolio_histories = run_all(file_to_run,
+                                                                            sizer_class=sizer_class,
+                                                                            strategy_class=strategy_class,
+                                                                            strategy_params=strategy_params,
+                                                                            sizer_params=sizer_params,
+                                                                            cash=cash,
+                                                                            mcap=mcap,
+                                                                            df_start_margin=2,
+                                                                            after_ath=True
+                                                                            )
+
+    df_save_path = results_folder + full_save_name
+
+    # Save details
+    with open(os.path.join(results_folder, full_detail_name), "w") as f:
+        f.write(json.dumps(detail, indent=4))
+
+    all_results_df.to_csv(df_save_path)
+    portfolio_histories_save_path = results_folder + "all_portfolio_histories" + name
+    print("df saved to ", df_save_path)
+    try:
+        with open(portfolio_histories_save_path, 'wb') as f:  # 'wb' for write binary
+            pickle.dump(all_portfolio_histories, f)
+        print(f"\nDictionary successfully saved to ", portfolio_histories_save_path)
+    except Exception as e:
+        print(f"Error saving dictionary: {e}")

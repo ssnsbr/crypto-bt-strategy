@@ -12,7 +12,7 @@ from strategies.Fibo78Once import FiboR78Once
 # from strategies.SimpleTest import SimpleTest
 from utils.data_utils import ready_df
 from utils.plotting_utils import plot_all_portfolio_histories, plot_all_portfolio_histories_by_time, plot_single_backtest
-from utils.runner import run_all  # Import pandas for data preparation
+from run_results.runner import run_all  # Import pandas for data preparation
 
 import backtrader as bt
 # !pip install backtrader
