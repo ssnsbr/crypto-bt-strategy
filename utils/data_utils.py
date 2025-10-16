@@ -5,6 +5,28 @@ import json
 import pandas as pd
 
 
+def read_all_detail_files():
+    # Collect all detail files
+    base_path = "/content/drive/MyDrive/charts/results/"
+    dfs = []
+
+    for fname in os.listdir(base_path):
+        if fname.endswith("_details.txt") and fname.startswith("details"):
+            filepath = os.path.join(base_path, fname)
+
+            try:
+                thisdf = read_detail_file(filepath)
+                dfs.append(thisdf)
+            except Exception as e:
+                print(f"⚠️ Skipping {fname}: {e}")
+
+    details_df = pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+    details_df = details_df[details_df["len"] > 50]
+
+    print(details_df.columns)
+    return details_df
+
+
 def ready_df(df_input, mcap=False):  # Renamed df to df_input to avoid conflict with local variable
     print("Preparing dataframe with size ", len(df_input))
     df_input["timestamp"] = df_input["time"]  # Assuming original 'time' is the ms timestamp

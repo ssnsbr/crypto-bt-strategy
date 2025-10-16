@@ -131,10 +131,6 @@ def analys_trades(df, name=""):
     pnl_perc_stats = df["pnl%"].describe()
 
     return {
-        name + "mean_ath": df["ath"].mean() if "ath" in df and not df["ath"].empty else 0,
-        name + "mean_time_len": df["time_len"].mean() if "time_len" in df and not df["time_len"].empty else 0,
-        name + "mean_time_to_ath": df["time_to_ath"].mean() if "time_to_ath" in df and not df["time_to_ath"].empty else 0,
-        name + "mean_time_after_ath": df["time_after_ath"].mean() if "time_after_ath" in df and not df["time_after_ath"].empty else 0,
 
         name + "cnt_trades": df["total_trades"].sum(),
         name + "mean_cnt_trades": df["total_trades"].mean(),
@@ -142,6 +138,11 @@ def analys_trades(df, name=""):
         name + "mean_cnt_sl": df["losing_trades"].mean(),
         name + "total_cnt_tp": df["winning_trades"].sum(),
         name + "mean_cnt_tp": df["winning_trades"].mean(),
+        #
+        name + "mean_ath": df["ath"].mean() if "ath" in df and not df["ath"].empty else 0,
+        name + "mean_time_len": df["time_len"].mean() if "time_len" in df and not df["time_len"].empty else 0,
+        name + "mean_time_to_ath": df["time_to_ath"].mean() if "time_to_ath" in df and not df["time_to_ath"].empty else 0,
+        name + "mean_time_after_ath": df["time_after_ath"].mean() if "time_after_ath" in df and not df["time_after_ath"].empty else 0,
         #
         name + "total_annualized_return": df["annualized_return"].sum(),
         name + "mean_annualized_return": df["annualized_return"].mean(),
@@ -198,7 +199,7 @@ def trimmed_mean(values, trim_ratio=0.05):
     return np.mean(trimmed)
 
 
-def analys(dfname, df=None, df_filename=None):
+def analys(dfname, df=None, df_filename=None, ath_df=None):
     # """Analyze trading results and return summary statistics as a DataFrame"""
     # try:
     # print("analys",dfname)
@@ -208,6 +209,18 @@ def analys(dfname, df=None, df_filename=None):
     else:
         all_results_df = df
         filename = df_filename
+
+    if "ath" in all_results_df.columns and not all_results_df["ath"].empty and ath_df is not None and not ath_df.empty:
+        all_results_df.set_index("coin", inplace=True)
+        ath_df.set_index("coin", inplace=True)
+        all_results_df = all_results_df.merge(
+            ath_df[["coin"] + ["ath", "time_len", "time_to_ath", "time_after_ath"]],
+            on="coin",
+            how="left"  # keep all coins even if some don't exist in ath_df
+        )
+
+    all_results_df.reset_index(inplace=True)
+
     # Convert to numeric
     all_results_df["final_value_numeric"] = pd.to_numeric(all_results_df["final_value"], errors='coerce')
     all_results_df["start_value_numeric"] = pd.to_numeric(all_results_df["start_value"], errors='coerce')
