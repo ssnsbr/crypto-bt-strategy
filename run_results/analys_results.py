@@ -131,6 +131,11 @@ def analys_trades(df, name=""):
     pnl_perc_stats = df["pnl%"].describe()
 
     return {
+        name + "mean_ath": df["ath"].mean(),
+        name + "mean_time_len": df["time_len"].mean(),
+        name + "mean_time_to_ath": df["time_to_ath"].mean(),
+        name + "mean_time_after_ath": df["time_after_ath"].mean(),
+
         name + "cnt_trades": df["total_trades"].sum(),
         name + "mean_cnt_trades": df["total_trades"].mean(),
         name + "total_cnt_sl": df["losing_trades"].sum(),
@@ -193,11 +198,16 @@ def trimmed_mean(values, trim_ratio=0.05):
     return np.mean(trimmed)
 
 
-def analys(dfname):
+def analys(dfname,df=None,df_filename=None):
     # """Analyze trading results and return summary statistics as a DataFrame"""
     # try:
     # print("analys",dfname)
-    all_results_df = pd.read_csv(dfname)
+    if df is None:
+        all_results_df = pd.read_csv(dfname)
+        filename = os.path.basename(dfname)
+    else:
+        all_results_df = df
+        filename = df_filename
     # Convert to numeric
     all_results_df["final_value_numeric"] = pd.to_numeric(all_results_df["final_value"], errors='coerce')
     all_results_df["start_value_numeric"] = pd.to_numeric(all_results_df["start_value"], errors='coerce')
@@ -205,6 +215,26 @@ def analys(dfname):
     all_results_df["value_pnl"] = all_results_df["final_value_numeric"] - all_results_df["start_value_numeric"]
     all_results_df["pnl%"] = (100 * all_results_df["value_pnl"]) / all_results_df["start_value_numeric"]
     #
+    # print("analys(dfname) all_results_df columns:",all_results_df.columns)
+    #  Index(['coin', 'start_value', 'final_value', 'sharpe_ratio', 'sortino_ratio',
+    #    'calmar_ratio', 'vwr', 'sqn', 'max_drawdown', 'avg_drawdown',
+    #    'total_trades', 'current_winning_streak', 'longest_winning_streak',
+    #    'current_losing_streak', 'longest_losing_streak', 'gross_total_pnl',
+    #    'gross_average_pnl', 'net_total_pnl', 'net_average_pnl',
+    #    'winning_trades', 'winning_total_pnl', 'winning_avg_pnl',
+    #    'winning_max_pnl', 'losing_trades', 'losing_total_pnl',
+    #    'losing_avg_pnl', 'losing_max_pnl', 'time_total', 'time_average',
+    #    'time_max', 'time_min', 'time_won_total', 'time_won_avg',
+    #    'time_won_max', 'time_won_min', 'time_lost_total', 'time_lost_avg',
+    #    'time_lost_max', 'time_lost_min', 'win_rate', 'avg_trade_pnl',
+    #    'best_trade_pnl', 'worst_trade_pnl', 'profit_factor',
+    #    'annualized_return', 'cumulative_return', 'trade_duration_mean',
+    #    'trade_duration_median', 'trade_duration_min', 'trade_duration_max',
+    #    'trade_duration_std', 'trade_duration_count', 'ib_count', 'tp_count',
+    #    'sl_count', 'ba_round_count', 'ba_count', 'counter_list', 'ath',
+    #    'time_len', 'time_to_ath', 'time_after_ath', 'final_value_numeric',
+    #    'start_value_numeric', 'value_pnl', 'pnl%'],
+    #   dtype='object')
     profitable_tokens_df = all_results_df[all_results_df["start_value_numeric"] < all_results_df["final_value_numeric"]]
     loss_tokens_df = all_results_df[all_results_df["start_value_numeric"] > all_results_df["final_value_numeric"]]
     no_change_df = all_results_df[all_results_df["start_value_numeric"] == all_results_df["final_value_numeric"]]
@@ -229,7 +259,7 @@ def analys(dfname):
 
     # Create result dictionary
     token_result = {
-        'filename': os.path.basename(dfname),
+        'filename':filename,
         'total_tokens': total_tokens,
         'profitable_tokens': profitable_tokens,
         'loss_tokens': loss_tokens,

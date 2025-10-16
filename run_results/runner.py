@@ -145,9 +145,11 @@ def run_backtest_for_df(df, coin_name,
         'coin': coin_name,
         'start_value': cash,
         'final_value': final_portfolio_value,
+
     }
     a_r = read_analysers(strategy)
     analysis_results = analysis_results | a_r
+    
     print('Analyze:')
     for k, v in analysis_results.items():
         print("[RUN] ", k, v)
@@ -213,10 +215,9 @@ def run_all(csv_files,
         df = pd.read_csv(csv_file)
         df = ready_df(df, mcap=mcap)
         coin_name = os.path.basename(csv_file).split('.')[0][17:27]  # Assuming coin name is the filename without extension
-
+        ath_index = df["close"].idxmax()
+        ath = df["close"].max()
         if (after_ath):
-            ath_index = df["close"].idxmax()
-            ath = df["close"].max()
             print("ATH is ", ath, " at index ", ath_index, " of ", len(df))
             df = df.loc[ath_index + 1:]
             print("After ATH len:", len(df))
@@ -230,6 +231,11 @@ def run_all(csv_files,
             mcap=mcap,
             commission_class=CustomSolanaCommission,
             sizer_params=sizer_params)
+        analysis_result["ath"]= ath
+        analysis_result["time_len"] = df["close"].iloc[-1] - df["close"].iloc[0]
+        analysis_result["time_to_ath"] = df["close"].iloc[ath_index + 1] - df["close"].iloc[0]
+        analysis_result["time_after_ath"] = df["close"].iloc[-1] - df["close"].iloc[ath_index + 1]
+
         all_results.append(analysis_result)
         all_cerebros[coin_name] = cerebro_obj
         all_portfolio_histories[coin_name] = portfolio_history_series
