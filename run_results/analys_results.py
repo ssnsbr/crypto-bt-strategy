@@ -131,10 +131,10 @@ def analys_trades(df, name=""):
     pnl_perc_stats = df["pnl%"].describe()
 
     return {
-        name + "mean_ath": df["ath"].mean(),
-        name + "mean_time_len": df["time_len"].mean(),
-        name + "mean_time_to_ath": df["time_to_ath"].mean(),
-        name + "mean_time_after_ath": df["time_after_ath"].mean(),
+        name + "mean_ath": df["ath"].mean() if "ath" in df and not df["ath"].empty else 0,
+        name + "mean_time_len": df["time_len"].mean() if "time_len" in df and not df["time_len"].empty else 0,
+        name + "mean_time_to_ath": df["time_to_ath"].mean() if "time_to_ath" in df and not df["time_to_ath"].empty else 0,
+        name + "mean_time_after_ath": df["time_after_ath"].mean() if "time_after_ath" in df and not df["time_after_ath"].empty else 0,
 
         name + "cnt_trades": df["total_trades"].sum(),
         name + "mean_cnt_trades": df["total_trades"].mean(),
@@ -198,7 +198,7 @@ def trimmed_mean(values, trim_ratio=0.05):
     return np.mean(trimmed)
 
 
-def analys(dfname,df=None,df_filename=None):
+def analys(dfname, df=None, df_filename=None):
     # """Analyze trading results and return summary statistics as a DataFrame"""
     # try:
     # print("analys",dfname)
@@ -259,7 +259,7 @@ def analys(dfname,df=None,df_filename=None):
 
     # Create result dictionary
     token_result = {
-        'filename':filename,
+        'filename': filename,
         'total_tokens': total_tokens,
         'profitable_tokens': profitable_tokens,
         'loss_tokens': loss_tokens,
