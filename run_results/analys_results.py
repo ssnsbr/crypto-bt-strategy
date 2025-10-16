@@ -209,17 +209,24 @@ def analys(dfname, df=None, df_filename=None, ath_df=None):
     else:
         all_results_df = df
         filename = df_filename
+    print(dfname, "all_results_df columns :", all_results_df.columns)
 
-    if "ath" in all_results_df.columns and not all_results_df["ath"].empty and ath_df is not None and not ath_df.empty:
-        all_results_df.set_index("coin", inplace=True)
-        ath_df.set_index("coin", inplace=True)
-        all_results_df = all_results_df.merge(
-            ath_df[["coin"] + ["ath", "time_len", "time_to_ath", "time_after_ath"]],
-            on="coin",
-            how="left"  # keep all coins even if some don't exist in ath_df
-        )
+
+    # add ath to results
+    if "ath" not in all_results_df.columns or all_results_df["ath"].empty:
+        # if ath is provided
+        if ath_df is not None and not ath_df.empty:
+            print("Merging ath_df with all_results_df")
+            # all_results_df.set_index("coin", inplace=True)
+            # ath_df.set_index("coin", inplace=True)
+            all_results_df = all_results_df.merge(
+                ath_df[["coin", "ath", "time_token", "time_to_ath", "time_after_ath", 'len_index_token', 'index_ath']],
+                on="coin",
+                how="left"  # keep all coins even if some don't exist in ath_df
+            )
 
     all_results_df.reset_index(inplace=True)
+    print("columns :", all_results_df.columns)
 
     # Convert to numeric
     all_results_df["final_value_numeric"] = pd.to_numeric(all_results_df["final_value"], errors='coerce')
