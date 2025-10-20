@@ -74,10 +74,6 @@ class MartingaleSizer(bt.Sizer):
                 self.log(f"[Sizer] Selling all {position.size:.2f} units")
             return position.size
 
-from strategies.Base import BaseTradingStrategy
-import backtrader as bt
-from riskmanagers.NoneRiskManagement import NoneRiskManagement
-
 
 class BaseBuySell20_30(BaseTradingStrategy):
 

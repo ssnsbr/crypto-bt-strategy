@@ -77,7 +77,8 @@ class BACounterAnalyzer(bt.Analyzer):
             'sl_count': 0,
             'ba_round_count': 0,
             'ba_count': 0,
-            'counter_list': []
+            'counter_list': [],
+            'main_list': []
         }
 
     def notify_trade(self, trade):
@@ -94,7 +95,8 @@ class BACounterAnalyzer(bt.Analyzer):
             'sl_count': getattr(s, 'sl_count', 0),
             'ba_round_count': getattr(s, 'ba_round_count', 0),
             'ba_count': getattr(s, 'ba_count', 0),
-            'counter_list': getattr(s, 'counter_list', [])
+            'counter_list': getattr(s, 'counter_list', []),
+            'main_list': getattr(s, 'main_list', [])
         }
 
     def get_analysis(self):

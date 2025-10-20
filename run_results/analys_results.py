@@ -177,6 +177,14 @@ def analys_trades(df, name=""):
     }
 
 
+def analyse_counter_list(counter_list):
+    pass
+
+
+def analyse_main_list(main_list):
+    pass
+
+
 def geometric_mean(returns):
     """
     Why: Compounding-style average return (less sensitive to huge pumps)
@@ -210,7 +218,6 @@ def analys(dfname, df=None, df_filename=None, ath_df=None):
         all_results_df = df
         filename = df_filename
     print(dfname, "all_results_df columns :", all_results_df.columns)
-
 
     # add ath to results
     if "ath" not in all_results_df.columns or all_results_df["ath"].empty:
