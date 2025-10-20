@@ -111,7 +111,7 @@ class BaseTradingStrategy(bt.Strategy):
 
     def log(self, txt, dt=None):
         if self.params.log:
-            dt = dt or self.datas[0].datetime.date(0)
+            dt = dt or self.datas[0].datetime.datetime(0)
             print(f'[Strategy] [{self.__class__.__name__}] Index {self.index} {dt.isoformat()}, {txt}')
 
     def catch_migration(self, current_price):

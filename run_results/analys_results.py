@@ -178,7 +178,47 @@ def analys_trades(df, name=""):
 
 
 def analyse_counter_list(counter_list):
-    pass
+    # [RUN] counter_list [3, 1, 1, 4, 2, 3, 1, 1, 2, 1, -4, -1]
+    #  3 means we had ib ba ba tp
+    # -4 means we had ib ba ba ba sl
+    # -1 means ib sl / dead coin / end
+    # +1 means ib tp
+    if not counter_list:
+        return {"error": "Empty counter_list"}
+
+    sl_max_count = min(counter_list)
+    tp_max_count = max(counter_list)
+    if (-1 * sl_max_count != tp_max_count):
+        print("⚠️ Something may be wrong with the counter_list:", tp_max_count, sl_max_count, counter_list)
+
+    tp_list = [c for c in counter_list if c > 0]
+    loss_list = [c for c in counter_list if c < 0]
+
+    len_total = len(counter_list)
+    tp_count = len(tp_list)
+    loss_count = len(loss_list)
+    # -1 = dead coin or early end
+    end_count = len([c for c in loss_list if (c != sl_max_count)])
+    sl_count = loss_count - end_count
+
+    mean_tp_depth = np.mean(tp_list) if tp_list else 0
+
+    values, counts = np.unique(counter_list, return_counts=True)
+    counter_dict = dict(zip(values, counts))
+
+    return {
+        "tp_list": tp_list,
+        "loss_list": loss_list,
+        "len_total": len_total,
+        "tp_count": tp_count,
+        "loss_count": loss_count,
+        "end_count": end_count,
+        "sl_count": sl_count,
+        "mean_tp_depth": mean_tp_depth,
+        "depth_dict": counter_dict,
+        "tp_max_count": tp_max_count,
+        "sl_max_count": sl_max_count
+    }
 
 
 def analyse_main_list(main_list):

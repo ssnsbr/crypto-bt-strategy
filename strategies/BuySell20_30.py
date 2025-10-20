@@ -113,6 +113,11 @@ class BaseBuySell20_30(BaseTradingStrategy):
         self.ba_count = 0
         self.ba_round_count = 0
         self.counter_list = []
+        self.main_list = []
+
+    def add_to_list(self, item):
+        dt = self.datas[0].datetime.datetime(0)
+        self.main_list.append((item, self.current_price, self.index, dt.isoformat()))
 
     def _reset_strategy_state(self):
         super()._reset_strategy_state()
@@ -122,6 +127,7 @@ class BaseBuySell20_30(BaseTradingStrategy):
         self.buy_counter = 0
         self.just_bought_index = 0
         self.just_sold_index = 0
+        self.add_to_list("r")
 
     def buy_wait(self):
         return self.index < self.just_bought_index + self.min_wait_before_buy
@@ -131,6 +137,8 @@ class BaseBuySell20_30(BaseTradingStrategy):
 
     def stop(self):
         """Called once at the end of the strategy"""
+        self.add_to_list("e")
+        self.buy_counter *= -1
         print(
             f"Strategy End  | InitBuy: {self.ib_count} | TP: {self.tp_count} | SL: {self.sl_count} | BuyAgain: {self.ba_round_count}  | BuyAgainAll:{self.ba_count} | self.counter_list: len={len(self.counter_list)} list= {self.counter_list}")
 
@@ -141,6 +149,7 @@ class BaseBuySell20_30(BaseTradingStrategy):
         self.just_bought_index = self.index
         self.buy_counter = 1
         self.ib_count += 1
+        self.add_to_list("ib")
 
     def again_buy(self):
         self.log(f'BUY AGAIN: {self.current_marketcap_str}')
@@ -151,6 +160,7 @@ class BaseBuySell20_30(BaseTradingStrategy):
         self.ba_count += 1
         if self.buy_counter == 2:
             self.ba_round_count += 1
+        self.add_to_list("ba")
 
     def sell_tp(self):
         self.log(f'TP SELL: {self.current_marketcap_str}')
@@ -158,12 +168,15 @@ class BaseBuySell20_30(BaseTradingStrategy):
         self.order = self.sell(size=position_size)
         self.just_sold_index = self.index
         self.tp_count += 1
+        self.add_to_list("tp")
 
     def sell_sl(self):
         self.log(f'Defeat SELL: {self.current_marketcap_str}')
         self.order = self.close()
         self.just_sold_index = self.index
         self.sl_count += 1
+        self.add_to_list("sl")
+        self.buy_counter *= -1
 
     def _execute_trading_logic(self):
         if not self.migrated or self.done:
@@ -211,9 +224,14 @@ class BaseBuySell20_30(BaseTradingStrategy):
         if in_position and self.current_price < self.p.end_mcap:
             self.log(f'Dead Coin SELL: {self.current_marketcap_str}')
             self.order = self.close()
+            self.buy_counter *= -1
+            self.add_to_list("d")
             self.done = True
             return
 
+
+class After_BaseBuySell20_30(BaseBuySell20_30):
+    pass
 
 # ***
 ####

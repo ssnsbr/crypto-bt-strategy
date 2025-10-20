@@ -1,5 +1,6 @@
 import json
 import pickle
+from random import randint
 import pandas as pd
 import numpy as np
 import os
@@ -192,7 +193,7 @@ def run_all(csv_files,
             sizer_params=None,
             strategy_params=None,
             mcap=False,
-            df_start_margin=0,
+            df_start_margin=100,
             df_end_margin=-1,
             after_ath=False
             ):
@@ -224,9 +225,10 @@ def run_all(csv_files,
             print("After ATH len:", len(df))
         else:
             df_to_run = df
-
+        tmp_start_marg = randint(1, min(df_start_margin, len(df_to_run) - df_end_margin - 1))
+        print("Start margin:", tmp_start_marg)
         analysis_result, cerebro_obj, portfolio_history_series = run_backtest_for_df(
-            df_to_run[df_start_margin:df_end_margin],
+            df_to_run[tmp_start_marg:df_end_margin],
             coin_name=coin_name,
             strategy_class=strategy_class,
             cash=cash,
