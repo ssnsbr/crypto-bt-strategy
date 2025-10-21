@@ -275,7 +275,7 @@ def run_all(csv_files,
     return results_df, all_cerebros, all_portfolio_histories
 
 
-def run_and_save(file_to_run, sizer_class, strategy_class, strategy_params, sizer_params, results_folder='/content/drive/MyDrive/charts/results/', cash=100, mcap=True, after_ath=False):
+def run_and_save(file_to_run, sizer_class, strategy_class, strategy_params, sizer_params, results_folder='/content/drive/MyDrive/charts/results/', cash=100, max_start_margin=100, mcap=True, after_ath=False):
     name, detail = get_name(strategy_class, strategy_params, sizer_class, sizer_params, len(file_to_run))
     full_save_name = name + "_memes.csv"
     full_detail_name = "details_" + name + "_details.txt"
@@ -288,7 +288,7 @@ def run_and_save(file_to_run, sizer_class, strategy_class, strategy_params, size
                                                                             sizer_params=sizer_params,
                                                                             cash=cash,
                                                                             mcap=mcap,
-                                                                            df_start_margin=2,
+                                                                            df_start_margin=max_start_margin,
                                                                             after_ath=after_ath
                                                                             )
 
@@ -304,6 +304,6 @@ def run_and_save(file_to_run, sizer_class, strategy_class, strategy_params, size
     try:
         with open(portfolio_histories_save_path, 'wb') as f:  # 'wb' for write binary
             pickle.dump(all_portfolio_histories, f)
-        print(f"\nDictionary successfully saved to ", portfolio_histories_save_path)
+        print("\nDictionary successfully saved to ", portfolio_histories_save_path)
     except Exception as e:
         print(f"Error saving dictionary: {e}")
