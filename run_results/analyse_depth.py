@@ -144,12 +144,7 @@ def analyse_depth_dict(ndf):
     return sorted_combined
 
 
-ba_factor = 0.8  # e.g., 20% step per buy
-tp_factor = 1.2  # e.g., 20% gain on TP
-sl_factor = 0.7
-
-
-def is_sl(depth, count, sizes):
+def is_sl(depth, count, sizes, ba_factor=0.8, tp_factor=1.2, sl_factor=0.7):
     amount = 0
     pow = 0
     # depth = -4 is 4 meaning size[3]*0.8
@@ -165,7 +160,7 @@ def is_sl(depth, count, sizes):
     return total_lost * -1
 
 
-def is_tp(depth, count, sizes):
+def is_tp(depth, count, sizes, ba_factor=0.8, tp_factor=1.2, sl_factor=0.7):
     amount = 0
     pow = 0
     # depth = 4 is 4 meaning size[3]*0.8
@@ -181,13 +176,13 @@ def is_tp(depth, count, sizes):
     return p
 
 
-def get_row_res(depth_distribution, sizes):
+def get_row_res(depth_distribution, sizes, ba_factor=0.8, tp_factor=1.2, sl_factor=0.7):
     a = 0
     for depth, count in depth_distribution.items():
         if depth < 0:
-            s = is_sl(depth, count, sizes)
+            s = is_sl(depth, count, sizes, ba_factor=ba_factor, tp_factor=tp_factor, sl_factor=sl_factor)
         else:
-            s = is_tp(depth, count, sizes)
+            s = is_tp(depth, count, sizes, ba_factor=ba_factor, tp_factor=tp_factor, sl_factor=sl_factor)
         a = a + s
         # print(depth,count,s)
         # print(a)
