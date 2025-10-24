@@ -25,7 +25,7 @@ def analyse_counter_list(counter_list):
     tp_max_count = max(counter_list)
     if (-1 * sl_max_count != tp_max_count):
         print("⚠️ Something may be wrong with the counter_list:", tp_max_count, sl_max_count, counter_list)
-
+    buys = sum(abs(x) for x in counter_list)
     tp_list = [c for c in counter_list if c > 0]
     loss_list = [c for c in counter_list if c < 0]
 
@@ -43,6 +43,8 @@ def analyse_counter_list(counter_list):
     depth_dict = {int(v): int(c) for v, c in zip(values, counts)}
 
     return {
+        "buys": buys,
+        "sells": len_total,
         "tp_list": tp_list,
         "loss_list": loss_list,
         "len_total": len_total,
@@ -102,8 +104,8 @@ def analyse_main_list(main_list):
             "price_ratio": end_price / ib_price if ib_price else 0
         })
     tmpdf = pd.DataFrame(stats)
-    print(tmpdf.groupby('depth')['ib_price'].mean())
-    print(tmpdf.groupby('depth')['price_ratio'].mean())
+    # print(tmpdf.groupby('depth')['ib_price'].mean())
+    # print(tmpdf.groupby('depth')['price_ratio'].mean())
     return tmpdf
 
 
@@ -131,6 +133,7 @@ def analys_one_df_of_tokens(rdf):
         if result_of_counter is not None:
             list_result_of_counter.append(result_of_counter)
     ndf = pd.DataFrame(list_result_of_counter)
+    print("--" * 10, f"ndf shape {ndf.shape}", "--" * 10)
     return ndf
 
 
