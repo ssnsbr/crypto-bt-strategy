@@ -80,10 +80,12 @@ class BaseBuySell20_30(BaseTradingStrategy):
     params = (
         ('log', True),
         ('tp', 1.2),                # Take profit at 120% of avg price
-        ('sl', 0.6),
-        ('buy_again', 0.7),         # Buy again at 70% of avg/last price
-        ('max_buy_count', 6),
+        ('sl', 0.7),
+        ('buy_again', 0.8),         # Buy again at 70% of avg/last price
+        ('max_buy_count', 4),
         ('end_mcap', 20_000),
+        ('min_ib_mcap', 20_000),
+        ("sell_on_no_loss", False),
         ("rsi", 100),
         ('dead_coin_market_cap', 9_000),
         ('migration_market_cap', 125_000),
@@ -138,7 +140,6 @@ class BaseBuySell20_30(BaseTradingStrategy):
     def stop(self):
         """Called once at the end of the strategy"""
         self.add_to_list("e")
-        self.buy_counter *= -1
         print(
             f"Strategy End  | InitBuy: {self.ib_count} | TP: {self.tp_count} | SL: {self.sl_count} | BuyAgain: {self.ba_round_count}  | BuyAgainAll:{self.ba_count} | self.counter_list: len={len(self.counter_list)} list= {self.counter_list}")
 
@@ -185,8 +186,9 @@ class BaseBuySell20_30(BaseTradingStrategy):
         in_position = self.getposition(self.datas[0]).size > 0
 
         # --- B1: Initial Buy ---
+        ib_cond = self.current_price > self.p.min_ib_mcap
         cond_rsi = self.rsi < self.p.rsi
-        if not in_position and cond_rsi and not self.buy_wait():
+        if not in_position and cond_rsi and not self.buy_wait() and ib_cond:
             self.init_buy()
             return
 
@@ -203,6 +205,8 @@ class BaseBuySell20_30(BaseTradingStrategy):
         if in_position and not self.sell_wait():
             if self.p.sell_tp_on_avg:
                 sell_cond_tp = self.current_price > self.portfolio_avg_buy_price * self.p.tp
+            elif self.p.sell_on_no_loss and self.buy_counter != 1 and self.buy_counter != 0:
+                sell_cond_tp = self.current_price > self.portfolio_avg_buy_price
             else:
                 sell_cond_tp = self.current_price > self.last_buy_price * self.p.tp
             if sell_cond_tp:

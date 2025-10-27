@@ -131,7 +131,14 @@ def run_backtest_for_df(df, coin_name,
         print(f'[RUN] Starting backtest for {coin_name} - Initial Portfolio Value: {cerebro.broker.getvalue()/1_000_000_000:.2f}')
     else:
         print(f'[RUN] Starting backtest for {coin_name} - Initial Portfolio Value: {cerebro.broker.getvalue():.2f}')
-
+    if len(df) < 100:
+        print(f'[RUN] Not enough data for {coin_name}. Skipping backtest.')
+        analysis_results = {
+            'coin': coin_name,
+            'start_value': cash,
+            'final_value': cash,
+        }
+        return analysis_results, cerebro, []
     results = cerebro.run()
     strategy = results[0]
     print("[RUN] Cerebro Ended.")
@@ -146,7 +153,6 @@ def run_backtest_for_df(df, coin_name,
         'coin': coin_name,
         'start_value': cash,
         'final_value': final_portfolio_value,
-
     }
     a_r = read_analysers(strategy)
     analysis_results = analysis_results | a_r
@@ -186,6 +192,43 @@ def run_backtest_for_df(df, coin_name,
     return analysis_results, cerebro, cash_history_series
 
 
+def calculate_starting_index_time(df, after_ath=False, randomize=True, max_random_start_margin=100, end_margin=-1, min_start_time_to_wait=0):
+    starting_index = 0
+    df_to_run = df
+
+    if after_ath:
+        ath_index = df["close"].idxmax()
+        ath = df["close"].max()
+        print("ATH is ", ath, " at index ", ath_index, " of ", len(df))
+        df_to_run = df.loc[ath_index + 1:]
+        print("calculate_starting_index_time After ATH len:", len(df_to_run))
+        starting_index = max(starting_index, ath_index)
+
+    if min_start_time_to_wait != 0:
+        df["date_time"] = pd.to_datetime(df["timestamp"])
+        get_first = df["date_time"].iloc[0]
+        cutoff = get_first + pd.Timedelta(hours=min_start_time_to_wait)
+        # Filter rows after that cutoff
+        later_rows = df[df["date_time"] >= cutoff]
+        min_len = 50
+        if not later_rows.empty:
+            starting_index = max(starting_index, later_rows.index[0])
+            df_to_run = df[starting_index:]
+            print("calculate_starting_index_time After time_to_wait len:", len(df_to_run))
+        else:
+            print(f"calculate_starting_index_time No rows found {min_start_time_to_wait}h after start; using default index len(df)- ", min_len, len(df) - min_len)
+
+            df_to_run = df[-min_len:]
+            starting_index = max(starting_index, len(df) - min_len)
+    else:
+        pass
+    if randomize:
+        random_start_margin = randint(1, min(max_random_start_margin, len(df_to_run) - end_margin - 1))
+        print("calculate_starting_index_time Randomized start margin:", random_start_margin, " => ", starting_index + random_start_margin)
+        return starting_index + random_start_margin
+    return starting_index
+
+
 def run_all(csv_files,
             sizer_class=FiboMartingaleSizer,
             strategy_class=FiboMartingaleStrategy,
@@ -195,7 +238,8 @@ def run_all(csv_files,
             mcap=False,
             df_start_margin=100,
             df_end_margin=-1,
-            after_ath=False
+            after_ath=False,
+            min_start_time_to_wait=4,
             ):
     """
     Runs backtests for multiple coin dataframes and aggregates results.
@@ -219,16 +263,10 @@ def run_all(csv_files,
         ath_index = df["close"].idxmax()
         ath = df["close"].max()
 
-        if (after_ath):
-            print("ATH is ", ath, " at index ", ath_index, " of ", len(df))
-            df_to_run = df.loc[ath_index + 1:]
-            print("After ATH len:", len(df))
-        else:
-            df_to_run = df
-        tmp_start_marg = randint(1, min(df_start_margin, len(df_to_run) - df_end_margin - 1))
+        tmp_start_marg = calculate_starting_index_time(df, after_ath=after_ath, randomize=True, max_random_start_margin=df_start_margin, end_margin=-1, min_start_time_to_wait=min_start_time_to_wait)
         print("Start margin:", tmp_start_marg)
         analysis_result, cerebro_obj, portfolio_history_series = run_backtest_for_df(
-            df_to_run[tmp_start_marg:df_end_margin],
+            df[tmp_start_marg:df_end_margin],
             coin_name=coin_name,
             strategy_class=strategy_class,
             cash=cash,

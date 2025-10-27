@@ -128,48 +128,74 @@ def analys_trades(df, name=""):
     #  Unnamed: 0        coin  start_value  final_value  sharpe_ratio    max_drawdown  total_trades  winning_trades  losing_trades  annualized_return
     # + pnl_perc + value_pnl + final_value_numeric + start_value_numeric
     # print("analys_trades:"+name,"\n",df)
-    pnl_perc_stats = df["pnl%"].describe()
+
+    def safe_mean(col):
+        return df[col].mean() if col in df and not df[col].dropna().empty else 0
+
+    def safe_sum(col):
+        return df[col].sum() if col in df and not df[col].dropna().empty else 0
+    if df is None or len(df) == 0:
+        return {name + "_empty": True}
+    # Ensure required columns exist before describing
+    pnl_perc_stats = {}
+    if "pnl%" in df and not df["pnl%"].dropna().empty:
+        # pnl_perc_stats = df["pnl%"].describe()
+        desc = df["pnl%"].describe()
+        pnl_perc_stats = {
+            "mean": desc.get("mean", 0),
+            "max": desc.get("max", 0),
+            "min": desc.get("min", 0),
+            "std": desc.get("std", 0),
+            "median": desc.get("50%", 0)
+        }
+    else:
+        pnl_perc_stats = {"mean": 0, "max": 0, "min": 0, "std": 0, "median": 0}
 
     return {
+        # --- Trade Counts ---
+        name + "cnt_trades": safe_sum("total_trades"),
+        name + "mean_cnt_trades": safe_mean("total_trades"),
+        name + "total_cnt_sl": safe_sum("losing_trades"),
+        name + "mean_cnt_sl": safe_mean("losing_trades"),
+        name + "total_cnt_tp": safe_sum("winning_trades"),
+        name + "mean_cnt_tp": safe_mean("winning_trades"),
+        # --- Time metrics ---
+        name + "mean_ath": safe_mean("ath"),
+        name + "mean_time_len": safe_mean("time_len"),
+        name + "mean_time_to_ath": safe_mean("time_to_ath"),
+        name + "mean_time_after_ath": safe_mean("time_after_ath"),
+        #
 
-        name + "cnt_trades": df["total_trades"].sum(),
-        name + "mean_cnt_trades": df["total_trades"].mean(),
-        name + "total_cnt_sl": df["losing_trades"].sum(),
-        name + "mean_cnt_sl": df["losing_trades"].mean(),
-        name + "total_cnt_tp": df["winning_trades"].sum(),
-        name + "mean_cnt_tp": df["winning_trades"].mean(),
-        #
-        name + "mean_ath": df["ath"].mean() if "ath" in df and not df["ath"].empty else 0,
-        name + "mean_time_len": df["time_len"].mean() if "time_len" in df and not df["time_len"].empty else 0,
-        name + "mean_time_to_ath": df["time_to_ath"].mean() if "time_to_ath" in df and not df["time_to_ath"].empty else 0,
-        name + "mean_time_after_ath": df["time_after_ath"].mean() if "time_after_ath" in df and not df["time_after_ath"].empty else 0,
-        #
-        name + "total_annualized_return": df["annualized_return"].sum(),
-        name + "mean_annualized_return": df["annualized_return"].mean(),
-        name + "mean_max_drawdown": df["max_drawdown"].mean(),
-        #
-        name + 'mean_pnl%': pnl_perc_stats['mean'],
-        name + 'max_pnl%': pnl_perc_stats['max'],
-        name + 'min_pnl%': pnl_perc_stats['min'],
-        name + 'std_pnl%': pnl_perc_stats['std'],
-        name + 'median_pnl%': pnl_perc_stats['50%'],
-        #
-        name + "time_average": df["time_average"].mean() if "time_average" in df and not df["time_average"].empty else 0,
-        name + "time_won_avg": df["time_won_avg"].mean() if "time_won_avg" in df and not df["time_won_avg"].empty else 0,
-        name + "time_lost_avg": df["time_lost_avg"].mean() if "time_lost_avg" in df and not df["time_lost_avg"].empty else 0,
-        #
-        name + "mean_InitBuy": df["ib_count"].mean() if "ib_count" in df and not df["ib_count"].empty else 0,
-        name + "mean_TP_count": df["tp_count"].mean() if "tp_count" in df and not df["tp_count"].empty else 0,
-        name + "mean_SL_count": df["sl_count"].mean() if "sl_count" in df and not df["sl_count"].empty else 0,
-        name + "mean_BA_round_count": df["ba_round_count"].mean() if "ba_round_count" in df and not df["ba_round_count"].empty else 0,
-        name + "mean_BA_count": df["ba_count"].mean() if "ba_count" in df and not df["ba_count"].empty else 0,
+        # --- Performance metrics ---
+        name + "total_annualized_return": safe_sum("annualized_return"),
+        name + "mean_annualized_return": safe_mean("annualized_return"),
+        name + "mean_max_drawdown": safe_mean("max_drawdown"),
+        # --- PnL% summary ---
+        name + "mean_pnl%": pnl_perc_stats["mean"],
+        name + "max_pnl%": pnl_perc_stats["max"],
+        name + "min_pnl%": pnl_perc_stats["min"],
+        name + "std_pnl%": pnl_perc_stats["std"],
+        name + "median_pnl%": pnl_perc_stats["median"],
+
+        # --- Trade durations ---
+        name + "time_average": safe_mean("time_average"),
+        name + "time_won_avg": safe_mean("time_won_avg"),
+        name + "time_lost_avg": safe_mean("time_lost_avg"),
+
+        # --- Counter metrics ---
+        name + "mean_InitBuy": safe_mean("ib_count"),
+        name + "mean_TP_count": safe_mean("tp_count"),
+        name + "mean_SL_count": safe_mean("sl_count"),
+        name + "mean_BA_round_count": safe_mean("ba_round_count"),
+        name + "mean_BA_count": safe_mean("ba_count"),
+
+        name + "sum_InitBuy": safe_sum("ib_count"),
+        name + "sum_TP_count": safe_sum("tp_count"),
+        name + "sum_SL_count": safe_sum("sl_count"),
+        name + "sum_BA_round_count": safe_sum("ba_round_count"),
+        name + "sum_BA_count": safe_sum("ba_count"),
+
         # name + "Counter_list": df["counter_list"].iloc[0] if "counter_list" in df and not df["counter_list"].empty else [],
-        #
-        name + "sum_InitBuy": df["ib_count"].sum() if "ib_count" in df and not df["ib_count"].empty else 0,
-        name + "sum_TP_count": df["tp_count"].sum() if "tp_count" in df and not df["tp_count"].empty else 0,
-        name + "sum_SL_count": df["sl_count"].sum() if "sl_count" in df and not df["sl_count"].empty else 0,
-        name + "sum_BA_round_count": df["ba_round_count"].sum() if "ba_round_count" in df and not df["ba_round_count"].empty else 0,
-        name + "sum_BA_count": df["ba_count"].sum() if "ba_count" in df and not df["ba_count"].empty else 0,
         # name + "Counter_list": df["counter_list"].iloc[0] if "counter_list" in df and not df["counter_list"].empty else [],
         #
 
