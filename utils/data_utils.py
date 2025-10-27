@@ -80,6 +80,11 @@ def read_detail_file(filepath: str) -> pd.DataFrame:
     for k, v in data.get("sizer_params", {}).items():
         flat_data[f"sizer_{k}"] = v
 
+    # Flatten run_config if exists
+    run_config = data.get("run_config", {})
+    for k, v in run_config.items():
+        flat_data[f"run_config_{k}"] = v
+
     # Keep filename too (optional, helps debugging)
     flat_data["filename"] = os.path.basename(filepath)[8:-12] + "_memes.csv"
 

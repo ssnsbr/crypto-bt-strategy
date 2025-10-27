@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 
 from run_results.analys_results import analys
+from run_results.runner_config import RunConfig
 from sizers.ScalperMartingaleSizer import ScalperMartingaleSizer
 from strategies.SimpleMartingaleStrategy import MartingaleSizer, SimpleMartingaleStrategy
 from strategies.Fibo78Once import FiboR78Once
@@ -80,14 +81,13 @@ if __name__ == "__main__":
                                                                             strategy_class=strategy_class,
                                                                             strategy_params=strategy_params,
                                                                             sizer_params=sizer_params,
-                                                                            cash=1000,
-                                                                            mcap=mcap,
+                                                                            config=RunConfig(),
                                                                             )
     print("All Runs Complete!")
     # if __name__ == '__main__':
     # Step 1: Run all backtests
     # all_results_df, all_cerebros_objects, all_portfolio_histories = run_all(csv_files[:2], FiboMartingaleStrategy, 10, 0.1, mcap=True)
-    print(analys(dfname=None,df=all_results_df,df_filename="test"))
+    print(analys(dfname=None, df=all_results_df, df_filename="test"))
     # Step 2: Display the aggregated results DataFrame
     g = all_results_df[all_results_df["start_value"] < all_results_df["final_value"]]
     print(f"{len(g)} of {len(all_results_df)} were profitable!")

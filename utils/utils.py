@@ -1,3 +1,4 @@
+from dataclasses import asdict
 from datetime import datetime
 
 
@@ -11,7 +12,7 @@ def getstring(dic):
     return ret
 
 
-def get_name(strategy_class, strategy_params, sizer_class, sizer_params, len_file):
+def get_name(strategy_class, strategy_params, sizer_class, sizer_params, len_file, config=None):
     date_str = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")  # or "%Y%m%d_%H%M%S" if you want timestamp
     naming = [strategy_class.__name__, sizer_class.__name__, date_str, "len-" + str(len_file)]
     # Detail string (longer version, readable)
@@ -25,6 +26,8 @@ def get_name(strategy_class, strategy_params, sizer_class, sizer_params, len_fil
     }
     name = "_".join(naming)
     # detail = "_".join(details)
+    if config is not None:
+        details["run_config"] = asdict(config)  # converts dataclass → dict
 
     return name, details
 
