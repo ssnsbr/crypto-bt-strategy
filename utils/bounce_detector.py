@@ -80,6 +80,9 @@ class BounceDetector:
 
         return ab
 
+    def get_state(self):
+        return self.afterbuy
+
     def reset(self):
         """Reset the detector state"""
         self.afterbuy = None

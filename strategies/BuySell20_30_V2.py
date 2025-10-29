@@ -3,6 +3,7 @@
 from strategies.Base import BaseTradingStrategy
 from riskmanagers.NoneRiskManagement import NoneRiskManagement
 from utils.bounce_detector import BounceDetector
+from utils.liveliness_tracker import LivelinessTracker
 
 
 # class BaseBuySell20_30_V2(BaseTradingStrategy):
@@ -172,7 +173,6 @@ from utils.bounce_detector import BounceDetector
 #             self.done = True
 #             return
 
-
 class BaseBuySell20_30_V3(BaseTradingStrategy):
 
     params = (
@@ -189,6 +189,8 @@ class BaseBuySell20_30_V3(BaseTradingStrategy):
         ("sell_on_no_loss", False),
         ("up_bounce_threshold", 1.1),
         ("down_bounce_threshold", 0.9),
+        ("no_buy_on_down_fall", False),
+        ("min_liveliness_for_ba": 0.4)
         #
         ("rsi", 100),
         ('dead_coin_market_cap', 9_000),
@@ -228,15 +230,26 @@ class BaseBuySell20_30_V3(BaseTradingStrategy):
         self.min_after_buy = 0
         self.max_after_buy = 0
         self.bounceDetector = BounceDetector()
+        self.bounce_state = None
+        self.liveliness_tracker = LivelinessTracker(window=120)
 
     def current_bounce_from_min(self):
-        return (self.current_price / self.min_after_buy)
+        if self.min_after_buy != 0:
+            return (self.current_price / self.min_after_buy)
+        else:
+            return 1
 
     def analyze_bounces(self, bounce_list):
         pass
 
-    def buy_again_decider(self):
-        return False
+    def is_on_down_fall(self):
+        state = self.bounceDetector.get_state()
+        if state is None:
+            return True
+        if len(state["bounce_list"]) > self.buy_counter - 1:
+            return False
+        else:
+            return True
 
     # Detect if a local bounce of at least X% happened since first buy
     def detect_bounce(self, current_price, up_bounce_threshold=1.1, down_bounce_threshold=0.9):
@@ -259,12 +272,12 @@ class BaseBuySell20_30_V3(BaseTradingStrategy):
         super()._reset_strategy_state()
         self.buy_count = 0
         if self.buy_counter:
-            self.counter["counter_list"].append(self.buy_counter)
+            self.counters["counter_list"].append(self.buy_counter)
         self.buy_counter = 0
         self.just_bought_index = 0
         self.just_sold_index = 0
-        self.min_after_buy = 0.1  # for /0 error
-        self.max_after_buy = 0.1
+        self.min_after_buy = 0  # for /0 error
+        self.max_after_buy = 0
         self.add_to_list("r")
         self.bounceDetector.reset()
 
@@ -338,12 +351,18 @@ class BaseBuySell20_30_V3(BaseTradingStrategy):
         if not self.migrated or self.done:
             return
 
+        self.liveliness_tracker.update(self.current_price)
+        liveliness = self.liveliness_tracker.get_liveliness()
+
         in_position = self.getposition(self.datas[0]).size > 0
         if in_position:
-            self.min_after_buy = min(self.min_after_buy, self.current_price)
+            if self.min_after_buy == 0:
+                self.min_after_buy = self.current_price
+            else:
+                self.min_after_buy = min(self.min_after_buy, self.current_price)
             self.max_after_buy = max(self.max_after_buy, self.current_price)
-            bounce_state = self.bounceDetector.detect_bounce(self.current_price, up_bounce_threshold=self.p.up_bounce_threshold, down_bounce_threshold=self.p.down_bounce_threshold)
-            self.analyze_bounces(bounce_state["bounce_list"])
+            self.bounce_state = self.bounceDetector.detect_bounce(self.current_price, up_bounce_threshold=self.p.up_bounce_threshold, down_bounce_threshold=self.p.down_bounce_threshold)
+            self.analyze_bounces(self.bounce_state["bounce_list"])
 
         # --- B1: Initial Buy ---
         ib_cond = self.current_price > self.p.min_ib_mcap
@@ -357,9 +376,17 @@ class BaseBuySell20_30_V3(BaseTradingStrategy):
             buy_cond = self.current_price < self.portfolio_avg_buy_price * self.p.buy_again
         else:
             buy_cond = self.current_price < self.last_buy_price * self.p.buy_again
+        # no_buy_on_down_fall = False -> down_fall_cond=False -> not down_fall_cond= True
+        # no_buy_on_down_fall = True -> self.is_on_down_fall=False -> not down_fall_cond= True
+        # no_buy_on_down_fall = True -> self.is_on_down_fall=True -> not down_fall_cond= False
+        down_fall_cond = self.p.no_buy_on_down_fall and self.is_on_down_fall()
+        liveliness_cond = liveliness > self.p.min_liveliness_for_ba
         if in_position and buy_cond and self.buy_counter < self.p.max_buy_count:
-            self.order = self.again_buy()
-            return
+            if liveliness_cond and not down_fall_cond:
+                self.order = self.again_buy()
+                return
+            else:
+                print("***** NOT BUYING AGAIN: down_fall_cond:", down_fall_cond, ", liveliness_cond:", liveliness_cond)
 
         # --- NEWSell BFM: Sell on Bounce from Min
         if self.current_bounce_from_min() > self.p.sell_on_current_bounce_from_min:
