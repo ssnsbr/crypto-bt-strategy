@@ -39,7 +39,7 @@ def plot_all_portfolio_histories_by_time(all_portfolio_histories, title="Portfol
     """
     plt.figure(figsize=(20, 12))
     for coin_name, history_series in all_portfolio_histories.items():
-        if not history_series.empty:
+        if len(history_series) > 0:
             # Ensure history_series is indeed a Series with datetime index
             if not isinstance(history_series.index, pd.DatetimeIndex):
                 # This should not happen if run_backtest_for_df returns pd.Series correctly
@@ -67,7 +67,7 @@ def plot_all_portfolio_histories(all_portfolio_histories, title="Portfolio Value
     """
     plt.figure(figsize=(20, 12))
     for coin_name, history_series in all_portfolio_histories.items():
-        if not history_series.empty:
+        if len(history_series) > 0:
             # Ensure history_series is indeed a Series with datetime index
             if not isinstance(history_series.index, pd.DatetimeIndex):
                 # This should not happen if run_backtest_for_df returns pd.Series correctly
