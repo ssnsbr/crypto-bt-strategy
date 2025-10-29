@@ -190,7 +190,7 @@ class BaseBuySell20_30_V3(BaseTradingStrategy):
         ("up_bounce_threshold", 1.1),
         ("down_bounce_threshold", 0.9),
         ("no_buy_on_down_fall", False),
-        ("min_liveliness_for_ba": 0.4)
+        ("min_liveliness_for_ba", 0.4),
         #
         ("rsi", 100),
         ('dead_coin_market_cap', 9_000),
@@ -386,7 +386,7 @@ class BaseBuySell20_30_V3(BaseTradingStrategy):
                 self.order = self.again_buy()
                 return
             else:
-                print("***** NOT BUYING AGAIN: down_fall_cond:", down_fall_cond, ", liveliness_cond:", liveliness_cond)
+                print("***** NOT BUYING AGAIN: down_fall_cond:", down_fall_cond, ", liveliness_cond:", liveliness_cond, "liveliness:", liveliness)
 
         # --- NEWSell BFM: Sell on Bounce from Min
         if self.current_bounce_from_min() > self.p.sell_on_current_bounce_from_min:
