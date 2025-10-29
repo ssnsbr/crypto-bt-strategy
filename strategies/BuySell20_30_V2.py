@@ -386,7 +386,7 @@ class BaseBuySell20_30_V3(BaseTradingStrategy):
                 self.order = self.again_buy()
                 return
             else:
-                print("***** NOT BUYING AGAIN: down_fall_cond:", down_fall_cond, ", liveliness_cond:", liveliness_cond, "liveliness:", liveliness)
+                print("***** NOT BUYING AGAIN: down_fall_cond:", not down_fall_cond, ", liveliness_cond:", liveliness_cond, "liveliness:", liveliness)
 
         # --- NEWSell BFM: Sell on Bounce from Min
         if self.current_bounce_from_min() > self.p.sell_on_current_bounce_from_min:
