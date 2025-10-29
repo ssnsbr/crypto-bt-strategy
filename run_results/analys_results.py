@@ -14,7 +14,7 @@ def read_analysers(strategy):
     sqn_data = strategy.analyzers.mysqn.get_analysis()
     pyfolio_data = strategy.analyzers.mypyfolio.get_analysis()
     counter_data = strategy.analyzers.mybacounteranalyzer.get_analysis()
-
+    print("counter_data:", counter_data)
     # --- extract numeric pnl values safely ---
     won_pnl = trade_data.get('won', {}).get('pnl', {}).get('total', 0)
     lost_pnl = trade_data.get('lost', {}).get('pnl', {}).get('total', 0)

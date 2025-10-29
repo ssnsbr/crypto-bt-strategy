@@ -62,42 +62,16 @@ class CashHistoryAnalyzer(bt.Analyzer):
 
 
 class BACounterAnalyzer(bt.Analyzer):
-    """
-    Records strategy-specific counters and exposes them at the end.
-    """
+    """Collects strategy counters stored in strategy.counters"""
 
     def __init__(self):
         self.results = {}
 
-    def start(self):
-        """Called once at the start"""
-        self.results = {
-            'ib_count': 0,
-            'tp_count': 0,
-            'sl_count': 0,
-            'ba_round_count': 0,
-            'ba_count': 0,
-            'counter_list': [],
-            'main_list': []
-        }
-
-    def notify_trade(self, trade):
-        """Optional: update counters on trade events"""
-        pass  # If you want to increment counts per trade
-
     def stop(self):
-        """Called at the end of the strategy"""
-        # Pull values from the strategy instance
         s = self.strategy
-        self.results = {
-            'ib_count': getattr(s, 'ib_count', 0),
-            'tp_count': getattr(s, 'tp_count', 0),
-            'sl_count': getattr(s, 'sl_count', 0),
-            'ba_round_count': getattr(s, 'ba_round_count', 0),
-            'ba_count': getattr(s, 'ba_count', 0),
-            'counter_list': getattr(s, 'counter_list', []),
-            'main_list': getattr(s, 'main_list', [])
-        }
+        counters = getattr(s, "counters", {})
+        # Convert defaultdict to regular dict to make it serializable
+        self.results = dict(counters)
 
     def get_analysis(self):
         return self.results
