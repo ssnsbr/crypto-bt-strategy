@@ -191,6 +191,7 @@ class BaseBuySell20_30_V3(BaseTradingStrategy):
         ("down_bounce_threshold", 0.9),
         ("no_buy_on_down_fall", False),
         ("min_liveliness_for_ba", 0.4),
+        ("add_dynamic_ba", 0.05),
         #
         ("rsi", 100),
         ('dead_coin_market_cap', 9_000),
@@ -373,9 +374,9 @@ class BaseBuySell20_30_V3(BaseTradingStrategy):
 
         # --- B2: Averaging Down ---
         if self.p.buy_again_avg == 1:
-            buy_cond = self.current_price < self.portfolio_avg_buy_price * self.p.buy_again
+            buy_cond = self.current_price < self.portfolio_avg_buy_price * (self.p.buy_again - (self.p.add_dynamic_ba * self.buy_counter))
         else:
-            buy_cond = self.current_price < self.last_buy_price * self.p.buy_again
+            buy_cond = self.current_price < self.last_buy_price * (self.p.buy_again - (self.p.add_dynamic_ba * self.buy_counter))
         # no_buy_on_down_fall = False -> down_fall_cond=False -> not down_fall_cond= True
         # no_buy_on_down_fall = True -> self.is_on_down_fall=False -> not down_fall_cond= True
         # no_buy_on_down_fall = True -> self.is_on_down_fall=True -> not down_fall_cond= False

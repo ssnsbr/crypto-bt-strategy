@@ -317,7 +317,7 @@ def analys(dfname, df=None, df_filename=None, ath_df=None):
         # 'total_start_value': total_start_value,
         # 'total_final_value': total_final_value,
         # 'value_pnl': total_final_value - total_start_value,
-        '%total_pnl': ((total_final_value - total_start_value) / total_start_value * 100) if total_start_value > 0 else 0,
+        '%total_pnl': 100 * ((total_final_value - total_start_value) / total_start_value) if total_start_value > 0 else 0,
 
         # 'mean_final_value': final_value_stats['mean'],
         # 'max_final_value': final_value_stats['max'],
@@ -327,13 +327,47 @@ def analys(dfname, df=None, df_filename=None, ath_df=None):
 
 
     }
+
+    def add_if_not_exist(c):
+        if c not in all_results_df.columns:
+            all_results_df[c] = np.nan
+
+    add_if_not_exist("winning_total_pnl")
+    add_if_not_exist("winning_avg_pnl")
+    add_if_not_exist("losing_total_pnl")
+    add_if_not_exist("losing_avg_pnl")
+    add_if_not_exist("win_rate")
+
+    def get_rr_total():
+        # filter Non zero
+        filtered = all_results_df[all_results_df["losing_total_pnl"] != 0]
+        return (filtered["winning_total_pnl"] / filtered["losing_total_pnl"]).mean()
+
+    def get_rr_avg():
+        # filter Non zero
+        filtered = all_results_df[all_results_df["losing_avg_pnl"] != 0]
+        return (filtered["winning_avg_pnl"] / filtered["losing_avg_pnl"]).mean()
+
+    def get_token_wr():
+        filtered = all_results_df[all_results_df["final_value"] != all_results_df["start_value"]]
+        if len(filtered) > 0:
+            return len(filtered[filtered["pnl%"] > 0]) / len(filtered)
+        else:
+            return np.nan
+
     r2 = {
         "geo_mean_return": geometric_mean(all_results_df["pnl%"]),
         "trimmed_mean_5pct": trimmed_mean(all_results_df["pnl%"], 0.03),
         "median": np.median(all_results_df["pnl%"]),
         "p25": np.percentile(all_results_df["pnl%"], 25),
         "p75": np.percentile(all_results_df["pnl%"], 75),
-        "win_rate": (all_results_df["pnl%"] > 100).mean(),
+
+        "risk_reward_total": get_rr_total(),
+        "risk_reward_avg": get_rr_avg(),
+
+        "mean_win_rate": all_results_df[all_results_df["win_rate"] != 0]["win_rate"].mean(),
+        "token_win_rate": get_token_wr(),
+
         "max": np.max(all_results_df["pnl%"]),
         "min": np.min(all_results_df["pnl%"]),
         "iqr": np.percentile(all_results_df["pnl%"], 75) - np.percentile(all_results_df["pnl%"], 25),
