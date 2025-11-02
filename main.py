@@ -5,6 +5,7 @@ import pandas as pd
 from run_results.analys_results import analys
 from run_results.runner_config import RunConfig
 from sizers.ScalperMartingaleSizer import ScalperMartingaleSizer
+from strategies.BuySell20_30_INDICATOR import BaseBuySell20_30_INDICATORS
 from strategies.SimpleMartingaleStrategy import MartingaleSizer, SimpleMartingaleStrategy
 from strategies.Fibo78Once import FiboR78Once
 
@@ -63,7 +64,7 @@ if __name__ == "__main__":
     # strategy_class = FiboChecker
     # strategy_class = MAMACDStrategy
     # strategy_class = FiboR78Once
-    strategy_class = SimpleMartingaleStrategy
+    strategy_class = BaseBuySell20_30_INDICATORS
     strategy_params = {'data_in_market_cap': mcap, "log": log}
     sizer_class = bt.sizers.FixedSize
 

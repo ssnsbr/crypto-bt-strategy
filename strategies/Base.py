@@ -60,7 +60,7 @@ class BaseTradingStrategy(bt.Strategy):
         self.datahigh = self.datas[0].high
         self.datalow = self.datas[0].low
         self.datavolume = self.datas[0].volume
-        self.rsi = bt.indicators.RSI_Safe(self.datas[0].close, period=self.p.rsi_period)
+        # self.rsi = bt.indicators.RSI_Safe(self.datas[0].close, period=self.p.rsi_period)
         # self.rsi = SafeRSI(self.datas[0].close, period=self.p.rsi_period)
 
         # self.sma60 = bt.indicators.SimpleMovingAverage(self.datas[0].close, period=60)

@@ -180,6 +180,9 @@ class BaseBuySell20_30_V3(BaseTradingStrategy):
         ('tp', 1.2),                # Take profit at 120% of avg price
         ('sl', 0.7),
         ('buy_again', 0.8),         # Buy again at 70% of avg/last price
+        # -0.2 -0.38.2 -5 -61.8 -78 -85
+        #               0.8  0.64  0.512  0.4  0.32  0.26
+        ('buy_again_from_top', False),
         ('max_buy_count', 4),
         ('end_mcap', 20_000),
         ('min_ib_mcap', 20_000),
