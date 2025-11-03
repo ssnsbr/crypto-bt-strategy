@@ -286,23 +286,33 @@ class BaseBuySell20_30_INDICATORS(BaseTradingStrategy):
             stoch_d = self.stoch.percD
             stoch_cond = (stoch_k < self.p.STOCH_buy_threshold) and (stoch_k > stoch_d)
             # e.g. below 20 but %K crossing up %D
-
-        # === Combine all conditions ===
-        __cond = (
-            self.in_position
-            and buy_price_cond
-            and _buy_counter_cond
-            and liveliness_cond
+        __ind_cond = (
+            liveliness_cond
             and down_fall_cond
             and rsi_cond
             and macd_cond
             and ema_cond
             and stoch_cond
         )
+        # === Combine all conditions ===
+        __simple_cond = (
+            self.in_position
+            and buy_price_cond
+            and _buy_counter_cond
+        )
 
-        if self.in_position and buy_price_cond and _buy_counter_cond:
-            if not liveliness_cond or not down_fall_cond:
-                print("***** NOT BUYING AGAIN: down_fall_cond:", down_fall_cond, ", liveliness_cond:", liveliness_cond, "liveliness:", self.liveliness)
+        __cond = __simple_cond and __ind_cond
+
+        if __simple_cond:
+            if not __ind_cond:
+                print("***** NOT BUYING AGAIN: __ind_cond:",
+                      "down_fall_cond:", down_fall_cond,
+                      ", liveliness_cond:", liveliness_cond,
+                      "liveliness:", self.liveliness,
+                      ", rsi_cond:", rsi_cond,
+                      ", macd_cond:", macd_cond,
+                      ", ema_cond:", ema_cond,
+                      ", stoch_cond:", stoch_cond)
         return __cond
 
     def _execute_trading_logic(self):

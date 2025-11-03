@@ -11,3 +11,5 @@ class RunConfig:
     randomize_start_margin: bool = True
     df_end_margin: int = -1
     max_start_margin: int = 100
+    min_start_margin: int = 5
+    cerebro_runonce: bool = True

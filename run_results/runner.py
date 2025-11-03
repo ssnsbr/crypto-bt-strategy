@@ -97,7 +97,8 @@ def run_backtest_for_df(df, coin_name,
                         strategy_params=None,
                         sizer_params=None,
                         mcap=False,
-                        print_cash_history=False
+                        print_cash_history=False,
+                        runonce=True
                         ):
     """
     Runs a backtest for a single DataFrame and returns results and the cerebro object.
@@ -114,7 +115,7 @@ def run_backtest_for_df(df, coin_name,
     strategy_params = strategy_params or {}
     sizer_params = sizer_params or {}
 
-    cerebro = bt.Cerebro()
+    cerebro = bt.Cerebro(runonce=runonce)
 
     _configure_cerebro(
         cerebro=cerebro,
@@ -193,7 +194,7 @@ def run_backtest_for_df(df, coin_name,
     return analysis_results, cerebro, cash_history_series
 
 
-def calculate_starting_index_time(df, after_ath=False, randomize=True, max_random_start_margin=100, end_margin=-1, min_start_minutes_to_wait=0):
+def calculate_starting_index_time(df, after_ath=False, randomize=True, min_random_start_margin=30, max_random_start_margin=100, end_margin=-1, min_start_minutes_to_wait=0):
     starting_index = 0
     df_to_run = df
 
@@ -225,6 +226,7 @@ def calculate_starting_index_time(df, after_ath=False, randomize=True, max_rando
         pass
     if randomize:
         random_start_margin = randint(1, min(max_random_start_margin, len(df_to_run) - end_margin - 1))
+        random_start_margin = max(min_random_start_margin, random_start_margin)
         print("calculate_starting_index_time Randomized start margin:", random_start_margin, " => ", starting_index + random_start_margin)
         return starting_index + random_start_margin
     return starting_index
@@ -260,7 +262,7 @@ def run_all(csv_files,
         ath_index = df["close"].idxmax()
         ath = df["close"].max()
 
-        tmp_start_marg = calculate_starting_index_time(df, after_ath=config.after_ath, randomize=config.randomize_start_margin, max_random_start_margin=config.max_start_margin, end_margin=config.df_end_margin, min_start_minutes_to_wait=config.min_start_minutes_to_wait)
+        tmp_start_marg = calculate_starting_index_time(df, after_ath=config.after_ath, randomize=config.randomize_start_margin, min_random_start_margin=config.min_start_margin, max_random_start_margin=config.max_start_margin, end_margin=config.df_end_margin, min_start_minutes_to_wait=config.min_start_minutes_to_wait)
         print("Start margin:", tmp_start_marg)
         analysis_result, cerebro_obj, portfolio_history_series = run_backtest_for_df(
             df[tmp_start_marg:config.df_end_margin],
@@ -271,7 +273,8 @@ def run_all(csv_files,
             strategy_params=strategy_params,
             mcap=config.mcap,
             commission_class=CustomSolanaCommission,
-            sizer_params=sizer_params)
+            sizer_params=sizer_params,
+            runonce=config.cerebro_runonce)
 
         analysis_result["ath"] = ath
         analysis_result["time_token"] = (df["timestamp"].iloc[-1] - df["timestamp"].iloc[0]) / 1000
