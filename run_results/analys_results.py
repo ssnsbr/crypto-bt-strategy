@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 import os
 
+from run_results.acceptable import AcceptableStrategy
+
 
 def read_analysers(strategy):
     """ For each token, This happens after run to collect data from analyzers """
@@ -203,14 +205,16 @@ def analys_trades(df, name=""):
     }
 
 
-def geometric_mean(returns):
+def geometric_mean(ratios):
     """
     Why: Compounding-style average return (less sensitive to huge pumps)
     Use: For typical multiplicative growth rate (CAGR-like behavior)
     """
-    r = np.asarray(returns) / 100  # convert % to decimal if in percent
-    r = np.clip(r, -0.9999, None)  # avoid log(negative or zero)
-    return (np.exp(np.mean(np.log1p(r))) - 1) * 100
+    # r = np.asarray(returns) / 100  # convert % to decimal if in percent
+    # r = np.clip(r, -0.9999, None)  # avoid log(negative or zero)
+    # geo_mean = (np.exp(np.mean(np.log1p(r))) - 1) * 100
+    geo_mean = (np.prod(ratios)**(1 / len(ratios)) - 1) * 100
+    return geo_mean
 
 
 def trimmed_mean(values, trim_ratio=0.05):
@@ -258,6 +262,7 @@ def analys(dfname, df=None, df_filename=None, ath_df=None):
     all_results_df["start_value_numeric"] = pd.to_numeric(all_results_df["start_value"], errors='coerce')
     #
     all_results_df["value_pnl"] = all_results_df["final_value_numeric"] - all_results_df["start_value_numeric"]
+    all_results_df["ratios"] = all_results_df["final_value_numeric"] / all_results_df["start_value_numeric"]
     all_results_df["pnl%"] = (100 * all_results_df["value_pnl"]) / all_results_df["start_value_numeric"]
     #
     # print("analys(dfname) all_results_df columns:",all_results_df.columns)
@@ -302,10 +307,51 @@ def analys(dfname, df=None, df_filename=None, ath_df=None):
     # Get descriptive statistics
     # final_value_stats = all_results_df["final_value_numeric"].describe()
 
+    total_pnl = 100 * ((total_final_value - total_start_value) / total_start_value) if total_start_value > 0 else 0
+    # max_drawdown = all_results_df["max_drawdown"]
+    # geo_mean_return = all_results_df["max_drawdown"]
+    # all_results_df["max_drawdown"]
+
+    def get_rr_total():
+        # filter Non zero
+        filtered = all_results_df[all_results_df["losing_total_pnl"] != 0]
+        return (filtered["winning_total_pnl"] / filtered["losing_total_pnl"]).mean()
+
+    def get_rr_avg():
+        # filter Non zero
+        filtered = all_results_df[all_results_df["losing_avg_pnl"] != 0]
+        return (filtered["winning_avg_pnl"] / filtered["losing_avg_pnl"]).mean()
+
+    def get_token_wr():
+        filtered = all_results_df[all_results_df["final_value"] != all_results_df["start_value"]]
+        if len(filtered) > 0:
+            return len(filtered[filtered["pnl%"] > 0]) / len(filtered)
+        else:
+            return np.nan
+
+    metrics = {
+        "profitable_tokens%": profitable_tokens,
+        "total_pnl%": total_pnl,
+        "risk_reward_avg": get_rr_avg(),
+        "geo_mean_return": geometric_mean(all_results_df["ratios"]),
+        "max_drawdown": all_results_df["max_drawdown"].max(),
+        "mean_depth": all_results_df["ba_count"].mean(),
+        "mean_hold_time": all_results_df["trade_duration_mean"].mean(),
+    }
+
+    a = AcceptableStrategy(metrics)
+    tag = a.evaluate()
+    a.print_result()
+
+    # Output example:
+    # Result: ✅ Good | Score: 0.52
+    # Tag for DataFrame: ok0.52
+
     # Create result dictionary
     token_result = {
         'filename': filename,
         'total_tokens': total_tokens,
+        "Acceptable": tag,
         'profitable_tokens': profitable_tokens,
         'loss_tokens': loss_tokens,
         'none_tokens': none_tokens,
@@ -317,7 +363,7 @@ def analys(dfname, df=None, df_filename=None, ath_df=None):
         # 'total_start_value': total_start_value,
         # 'total_final_value': total_final_value,
         # 'value_pnl': total_final_value - total_start_value,
-        '%total_pnl': 100 * ((total_final_value - total_start_value) / total_start_value) if total_start_value > 0 else 0,
+        '%total_pnl': total_pnl,
 
         # 'mean_final_value': final_value_stats['mean'],
         # 'max_final_value': final_value_stats['max'],
@@ -337,23 +383,6 @@ def analys(dfname, df=None, df_filename=None, ath_df=None):
     add_if_not_exist("losing_total_pnl")
     add_if_not_exist("losing_avg_pnl")
     add_if_not_exist("win_rate")
-
-    def get_rr_total():
-        # filter Non zero
-        filtered = all_results_df[all_results_df["losing_total_pnl"] != 0]
-        return (filtered["winning_total_pnl"] / filtered["losing_total_pnl"]).mean()
-
-    def get_rr_avg():
-        # filter Non zero
-        filtered = all_results_df[all_results_df["losing_avg_pnl"] != 0]
-        return (filtered["winning_avg_pnl"] / filtered["losing_avg_pnl"]).mean()
-
-    def get_token_wr():
-        filtered = all_results_df[all_results_df["final_value"] != all_results_df["start_value"]]
-        if len(filtered) > 0:
-            return len(filtered[filtered["pnl%"] > 0]) / len(filtered)
-        else:
-            return np.nan
 
     r2 = {
         "geo_mean_return": geometric_mean(all_results_df["pnl%"]),
