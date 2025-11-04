@@ -1,3 +1,7 @@
+import numpy as np
+import pandas as pd
+
+
 class AcceptableStrategy:
     def __init__(self, metrics: dict):
         """
@@ -19,7 +23,9 @@ class AcceptableStrategy:
 
     def evaluate(self):
         m = self.m
-
+        for k, v in m.items():
+            if v is None or v is np.nan or v is pd.NA or v == "nan":
+                m[k] = 0
         # --- Conservative profile ---
         conservative = (
             m["profitable_tokens%"] >= 60 and
@@ -59,29 +65,33 @@ class AcceptableStrategy:
 
         # Normalize score
         self.score = round(max(min(self.score, 1.0), -0.5), 2)
-
+        if self.score is np.nan or self.score is pd.NA:
+            self.score = -1
         # --- Label mapping ---
         if self.score < 0:
             self.label = "❌ Reject"
-            self.tag = f"reject{self.score}"
+            self.tag = "reject"
         elif self.score < 0.3:
             self.label = "⚠️ Risky"
-            self.tag = f"risky{self.score}"
+            self.tag = "risky"
         elif self.score < 0.7:
             self.label = "✅ Good"
-            self.tag = f"ok{self.score}"
-        else:
+            self.tag = "ok"
+        elif self.score < 1.1:
             self.label = "🏆 Amazing"
-            self.tag = f"amazing{self.score}"
+            self.tag = "amazing"
+        else:
+            self.label = "Error!"
+            self.tag = "error"
 
         # Override if profile matches stronger label
         if scalp or conservative or aggressive:
             if self.score < 0.7:
                 self.score = 0.7
                 self.label = "🏆 Amazing"
-                self.tag = f"amazing{self.score}"
+                self.tag = "amazing"
 
-        return self.tag
+        return self.tag, self.score
 
     def print_result(self):
         print(f"Result: {self.label} | Score: {self.score:.2f}")
