@@ -2,12 +2,12 @@ import json
 import pickle
 import os
 
-from commissions.CustomSolanaCommission import CustomSolanaCommission
 from run_results.runner import calculate_starting_index_time, run_backtest_for_df
 from run_results.runner_config import RunConfig
 from sizers.FiboMartingaleSizer import FiboMartingaleSizer
 from strategies import FiboMartingaleStrategy
 from utils.utils import get_name
+import backtrader as bt
 
 
 def run_crypto_df(dataframe,
@@ -16,6 +16,7 @@ def run_crypto_df(dataframe,
                   strategy_class=FiboMartingaleStrategy,
                   sizer_params=None,
                   strategy_params=None,
+                  commission_class=None,
                   config: RunConfig = RunConfig()
                   ):
     """
@@ -40,7 +41,7 @@ def run_crypto_df(dataframe,
         cash=config.cash,
         sizer_class=sizer_class,
         strategy_params=strategy_params,
-        commission_class=CustomSolanaCommission,
+        commission_class=commission_class,
         sizer_params=sizer_params,
         runonce=config.cerebro_runonce)
 
@@ -50,18 +51,25 @@ def run_crypto_df(dataframe,
     return analysis_result, cerebro_obj, portfolio_history_series
 
 
-def run_and_save_crypto(dataframe, sizer_class, strategy_class, strategy_params, sizer_params, config: RunConfig):
+def run_and_save_crypto(dataframe, sizer_class, strategy_class, strategy_params, sizer_params, commission_class, config: RunConfig):
     name, detail = get_name(strategy_class, strategy_params, sizer_class, sizer_params, len(dataframe), config=config)
     results_folder = config.results_folder
     full_save_name = name + "_crypto.csv"
     full_detail_name = "details_" + name + "_crypto_details.txt"
     print(name, detail)
+    if commission_class is None:
+        class CommSOLAxiom(bt.CommissionInfo):
+            # 0.005 means 0.5% of the operation value
+            params = dict(commission=0.001)
+        commission_class = CommSOLAxiom
+
     all_results_df, all_cerebros_objects, all_portfolio_histories = run_crypto_df(dataframe,
                                                                                   sizer_class=sizer_class,
                                                                                   strategy_class=strategy_class,
                                                                                   strategy_params=strategy_params,
                                                                                   sizer_params=sizer_params,
                                                                                   config=config,
+                                                                                  commission_class=commission_class,
                                                                                   )
 
     df_save_path = results_folder + full_save_name
