@@ -83,6 +83,7 @@ class BaseCryptoTradingStrategy(bt.Strategy):
         self.current_price = 0.0
         self.current_marketcap_str = ""
         self.current_volume = 0  # Initialized for FastScalperStrategy
+        self.print_risk_management_once = True
         print("Base Trading Strategy Initialized")
     # --- Utility Methods ---
 
@@ -145,7 +146,7 @@ class BaseCryptoTradingStrategy(bt.Strategy):
         """Calculates the current average buy price and total quantity of the asset using Backtrader's position."""
 
         current_pos = self.getposition(self.datas[0])  # Get the current position for the data feed
-        if current_pos.size > 0:
+        if current_pos.size != 0:
             self.portfolio_total_quantity = current_pos.size
             self.portfolio_avg_buy_price = current_pos.price
             # Update highest price for dynamic TP from the current bar's close
@@ -168,7 +169,7 @@ class BaseCryptoTradingStrategy(bt.Strategy):
         self.log("Strategy state reset.")
 
     def stop(self):
-        if self.getposition(self.datas[0]).size > 0:
+        if self.getposition(self.datas[0]).size != 0:
             self.log(f'AT END OF BACKTEST! MarketCap {(self.current_price)}, '
                      f'Selling all {self.getposition(self.datas[0]).size:.2f} units.')
             self.order = self.close()
@@ -188,7 +189,7 @@ class BaseCryptoTradingStrategy(bt.Strategy):
         # print(len(self),  (self._last()), len(self.dataclose))
         if len(self) == self.data.buflen() - 1:
             self.log(f"Final bar reached. at index {self.index}, bar {len(self)}.")
-            if self.getposition().size > 0:
+            if self.getposition().size != 0:
                 self.log(f"Final bar reached. Selling all {self.getposition().size:.2f} units at {self.current_price}")
                 self.order = self.close()
             return
@@ -217,7 +218,8 @@ class BaseCryptoTradingStrategy(bt.Strategy):
         respecting the enable/disable parameters.
         Returns True if any risk management action was taken (order placed), False otherwise.
         """
-        if not self.risk_manager:
+        if not self.risk_manager and self.print_risk_management_once:
+            self.print_risk_management_once = False
             self.log("Warning: Risk manager not initialized for this strategy.")
             return False
 

@@ -60,18 +60,18 @@ def read_analysers(strategy):
         'losing_max_pnl': trade_data.get('lost', {}).get('pnl', {}).get('max', 0.0) / mcap_supply,
 
         # Long trades
-        # 'long_trades': trade_data.get('long', {}).get('total', 0),
-        # 'long_won': trade_data.get('long', {}).get('won', 0),
-        # 'long_lost': trade_data.get('long', {}).get('lost', 0),
-        # 'long_total_pnl': trade_data.get('long', {}).get('pnl', {}).get('total', 0.0) / mcap_supply,
-        # 'long_avg_pnl': trade_data.get('long', {}).get('pnl', {}).get('average', 0.0) / mcap_supply,
+        'long_trades': trade_data.get('long', {}).get('total', 0),
+        'long_won': trade_data.get('long', {}).get('won', 0),
+        'long_lost': trade_data.get('long', {}).get('lost', 0),
+        'long_total_pnl': trade_data.get('long', {}).get('pnl', {}).get('total', 0.0) / mcap_supply,
+        'long_avg_pnl': trade_data.get('long', {}).get('pnl', {}).get('average', 0.0) / mcap_supply,
 
         # Short trades
-        # 'short_trades': trade_data.get('short', {}).get('total', 0),
-        # 'short_won': trade_data.get('short', {}).get('won', 0),
-        # 'short_lost': trade_data.get('short', {}).get('lost', 0),
-        # 'short_total_pnl': trade_data.get('short', {}).get('pnl', {}).get('total', 0.0),
-        # 'short_avg_pnl': trade_data.get('short', {}).get('pnl', {}).get('average', 0.0),
+        'short_trades': trade_data.get('short', {}).get('total', 0),
+        'short_won': trade_data.get('short', {}).get('won', 0),
+        'short_lost': trade_data.get('short', {}).get('lost', 0),
+        'short_total_pnl': trade_data.get('short', {}).get('pnl', {}).get('total', 0.0),
+        'short_avg_pnl': trade_data.get('short', {}).get('pnl', {}).get('average', 0.0),
 
         # Trade duration stats
         'time_total': trade_data.get('len', {}).get('total', 0),
@@ -102,6 +102,17 @@ def read_analysers(strategy):
         # --- profit factor ---
         'profit_factor': (
             (won_pnl / abs(lost_pnl)) if lost_pnl else 'N/A'
+        ),
+        # --- Risk : Reward ratio ---
+        'risk_reward_ratio': (
+            (
+                abs(trade_data.get('won', {}).get('pnl', {}).get('average', 0.0)) /
+                abs(trade_data.get('lost', {}).get('pnl', {}).get('average', 1e-9))
+            ) if trade_data.get('lost', {}).get('pnl', {}).get('average', 0.0) else 'N/A'
+        ),
+        'risk_reward_str': (
+            f"1:{round(abs(trade_data.get('won', {}).get('pnl', {}).get('average', 0.0)) / abs(trade_data.get('lost', {}).get('pnl', {}).get('average', 1e-9)), 2)}"
+            if trade_data.get('lost', {}).get('pnl', {}).get('average', 0.0) else 'N/A'
         ),
 
         # --- Returns ---

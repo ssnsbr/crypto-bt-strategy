@@ -2,8 +2,8 @@
 
 from strategies.Base import BaseTradingStrategy
 from riskmanagers.NoneRiskManagement import NoneRiskManagement
-from utils.bounce_detector import BounceDetector
-from utils.liveliness_tracker import LivelinessTracker
+from indicators.bounce_detector import BounceDetector
+from indicators.liveliness_tracker import LivelinessTracker
 
 
 # class BaseBuySell20_30_V2(BaseTradingStrategy):
