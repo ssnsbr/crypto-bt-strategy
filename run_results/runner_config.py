@@ -6,6 +6,7 @@ class RunConfig:
     results_folder: str = '/content/drive/MyDrive/charts/results/'
     cash: float = 100
     mcap: bool = True
+    multi_tf: list = []  # 3m, 5m, 15m, 30m, 1h,4h
     after_ath: bool = False
     min_start_minutes_to_wait: int = 30
     randomize_start_margin: bool = True

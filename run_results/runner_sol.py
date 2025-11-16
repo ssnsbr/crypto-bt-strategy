@@ -23,7 +23,8 @@ def _configure_cerebro(
     sizer_params: dict,
     commission_class: type,
     initial_cash: float,
-    is_mcap: bool
+    is_mcap: bool,
+    multi_tf: list
 ):
     """
     Helper function to configure a Backtrader Cerebro object.
@@ -43,45 +44,37 @@ def _configure_cerebro(
         compression=1
     )
     cerebro.adddata(data)
-    data_5m = bt.feeds.PandasData(
-        dataname=df,
-        datetime='datetime',
-        open='open',
-        high='high',
-        low='low',
-        close='close',
-        volume='volume',
-        timeframe=bt.TimeFrame.Minutes,
-        compression=5
-    )
-    cerebro.adddata(data_5m)
-    data_15m = bt.feeds.PandasData(
-        dataname=df,
-        datetime='datetime',
-        open='open',
-        high='high',
-        low='low',
-        close='close',
-        volume='volume',
-        timeframe=bt.TimeFrame.Minutes,
-        compression=15
-    )
-    cerebro.adddata(data_15m)
 
-    data_1h = bt.feeds.PandasData(
-        dataname=df,
-        datetime='datetime',
-        open='open',
-        high='high',
-        low='low',
-        close='close',
-        volume='volume',
-        timeframe=bt.TimeFrame.Minutes,
-        compression=60
-    )
-    cerebro.adddata(data_1h)
-    # cerebro.resampledata(data, timeframe=bt.TimeFrame.Minutes, compression=15)
-    # cerebro.resampledata(data, timeframe=bt.TimeFrame.Minutes, compression=60)
+    def add_compression(df, c):
+        data_Xm = bt.feeds.PandasData(
+            dataname=df,
+            datetime='datetime',
+            open='open',
+            high='high',
+            low='low',
+            close='close',
+            volume='volume',
+            timeframe=bt.TimeFrame.Minutes,
+            compression=c
+        )
+
+        cerebro.adddata(data_Xm)
+    for mtf in multi_tf:
+        if mtf == "3m":
+            add_compression(df, 3)
+        if mtf == "5m":
+            add_compression(df, 5)
+        elif mtf == "15m":
+            add_compression(df, 15)
+        elif mtf == "30m":
+            add_compression(df, 30)
+        elif mtf == "1h":
+            add_compression(df, 60)
+        elif mtf == "4h":
+            add_compression(df, 240)
+
+        # cerebro.resampledata(data, timeframe=bt.TimeFrame.Minutes, compression=15)
+        # cerebro.resampledata(data, timeframe=bt.TimeFrame.Minutes, compression=60)
 
     # REGISTER YOUR SIZER
     print(f"[RUN] Sizer: {sizer_class.__name__}, Params: {sizer_params}")
@@ -131,7 +124,8 @@ def run_backtest_for_df(df, coin_name,
                         sizer_params=None,
                         mcap=False,
                         print_cash_history=False,
-                        runonce=True
+                        runonce=True,
+                        multi_tf=["5m"]
                         ):
     """
     Runs a backtest for a single DataFrame and returns results and the cerebro object.
@@ -159,7 +153,8 @@ def run_backtest_for_df(df, coin_name,
         sizer_params=sizer_params,
         commission_class=commission_class,
         initial_cash=cash,
-        is_mcap=mcap
+        is_mcap=mcap,
+        multi_tf=multi_tf
     )
 
     print(f'[RUN] Starting backtest for {coin_name} - Initial Portfolio Value: {cerebro.broker.getvalue():.2f}')
@@ -245,7 +240,8 @@ def run_crypto_df(dataframe,
         strategy_params=strategy_params,
         commission_class=commission_class,
         sizer_params=sizer_params,
-        runonce=config.cerebro_runonce)
+        runonce=config.cerebro_runonce,
+        multi_tf=config.multi_tf)
 
     analysis_result["time_token"] = (df["timestamp"].iloc[-1] - df["timestamp"].iloc[0]) / 1000
     analysis_result["len_index_token"] = len(df)

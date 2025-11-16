@@ -1,5 +1,7 @@
 import backtrader as bt
 from enum import Enum
+import pandas as pd
+from strategies.Base_Crypto import BaseCryptoTradingStrategy
 
 
 class BounceDetector:
@@ -134,6 +136,8 @@ class PIVOTTYPE(Enum):
     LH = 19
     BU = 2
     BD = 3
+    BUMA = 21
+    BDMA = 31
     START = 0
 
 
@@ -159,6 +163,7 @@ class FindTrendByBounce:
         self.main_structure = []
         self.last_processed_bounce = None
         self.current_undetermined_price = None
+        self.ma_cross = None
 
     def _not_new(self, newb):
         if not self.last_processed_bounce:
@@ -169,6 +174,25 @@ class FindTrendByBounce:
             self.last_processed_bounce["end"] == newb["end"]
         )
 
+    def _update_ma(self, time, price, ma):
+        previous_pivot = self.main_structure[-1]
+        previous_previous_pivot = self.main_structure[-2]
+        ma_value = ma
+        _p = None
+        if self.ma_cross is None:
+            self.ma_cross = 'above' if price > ma_value else 'below'
+            return
+
+        if self.ma_cross == 'below' and price > ma_value:
+            self.ma_cross = 'above'
+            _p = Pivot(time, pivot_type=PIVOTTYPE.BUMA, direction=DIRECTION.WITH_TREND, trend=TREND.UP, price=price)
+            self.structure.append(_p)
+
+        elif self.ma_cross == 'above' and price < ma_value:
+            self.ma_cross = 'below'
+            _p = Pivot(time, pivot_type=PIVOTTYPE.BDMA, direction=DIRECTION.WITH_TREND, trend=TREND.UP, price=price)
+            self.structure.append(_p)
+
     def _update_price(self, time, price):
         previous_pivot = self.main_structure[-1]
         previous_previous_pivot = self.main_structure[-2]
@@ -178,6 +202,7 @@ class FindTrendByBounce:
             return
         if self.structure[-1].pivot_type == PIVOTTYPE.BD:
             return
+
         if previous_pivot.pivot_type == PIVOTTYPE.LL:
             if previous_previous_pivot.price < price:
                 # A break out Happened!
@@ -186,7 +211,7 @@ class FindTrendByBounce:
         elif previous_pivot.pivot_type == PIVOTTYPE.LH:
             if previous_pivot.price < price:
                 # A break out Happened!
-                _p = Pivot(time, pivot_type=PIVOTTYPE.BU, direction=DIRECTION.WITH_TREND, trend=TREND.DOWN, price=price)
+                _p = Pivot(time, pivot_type=PIVOTTYPE.BU, direction=DIRECTION.WITH_TREND, trend=TREND.UP, price=price)
 
         elif previous_pivot.pivot_type == PIVOTTYPE.HH:
             if previous_previous_pivot.price > price:
@@ -194,9 +219,9 @@ class FindTrendByBounce:
                 _p = Pivot(time, pivot_type=PIVOTTYPE.BD, direction=DIRECTION.WITH_TREND, trend=TREND.DOWN, price=price)
 
         elif previous_pivot.pivot_type == PIVOTTYPE.HL:
-            if previous_pivot.price < price:
+            if previous_pivot.price > price:
                 # A break out Happened!
-                _p = Pivot(time, pivot_type=PIVOTTYPE.BD, direction=DIRECTION.WITH_TREND, trend=TREND.UP, price=price)
+                _p = Pivot(time, pivot_type=PIVOTTYPE.BD, direction=DIRECTION.WITH_TREND, trend=TREND.DOWN, price=price)
         else:
             print("Warning! This should NOT happen.", previous_pivot.pivot_type)
         if _p:
@@ -261,7 +286,7 @@ class FindTrendByBounce:
         self.main_structure.append(p)
         return
 
-    def update(self, bounce_state, time, price):
+    def update(self, bounce_state, time, price, ma=None):
         bounces = bounce_state.get("bounce_list", [])
         if not bounces:
             return
@@ -293,6 +318,9 @@ class FindTrendByBounce:
             self.current_undetermined_price = b["end"]
             return
 
+        if ma:
+            self._update_ma(time, price, ma)
+
         if self._not_new(bounces[-1]):
             self._update_price(time, price)
             return
@@ -314,6 +342,64 @@ class FindTrendByBounce:
 
     def get_main_structure(self):
         return self.main_structure
+
+
+# ==== Indicator Wrapper ====
+class BounceTrendIndicator(bt.Indicator):
+    lines = ('trend',)
+    plotinfo = dict(plot=True, subplot=False)
+    plotlines = dict(trend=dict(color='blue', _name='Trend'))
+
+    params = dict(
+        up_bounce_threshold=1.01,
+        down_bounce_threshold=0.99
+    )
+
+    def __init__(self):
+        self.bd = BounceDetector()
+        self.ft = FindTrendByBounce()
+        self.ma = bt.indicators.SimpleMovingAverage(self.data, period=50)
+
+    def next(self):
+        price = self.data[0]
+        state = self.bd.detect_bounce(price, self.data.datetime.datetime(0),
+                                      up_bounce_threshold=self.p.up_bounce_threshold,
+                                      down_bounce_threshold=self.p.down_bounce_threshold)
+
+        self.ft.update(state, self.data.datetime.datetime(0), price, self.ma[0])
+
+        structure = self.ft.get_structure()
+        if structure:
+            last_pivot = structure[-1]
+            self.lines.trend[0] = 1 if last_pivot.trend == TREND.UP else -1
+        else:
+            self.lines.trend[0] = 0
+
+    def get_pivots(self):
+        st = self.ft.get_structure()
+        return [(p.time, p.price, p.pivot_type.name) for p in self.ft.get_structure()]
+
+
+# ==== Simple Test Strategy ====
+class TestStrategy(BaseCryptoTradingStrategy):
+    def __init__(self):
+        super().__init__()
+        self.bt_indicator = BounceTrendIndicator(self.data)
+        self.results = {
+            "l": [],
+            "s": []
+        }
+
+    def next(self):
+        trend = self.bt_indicator.trend[0]
+        dt = self.data.datetime.datetime(0)
+        ps = self.bt_indicator.get_pivots()
+        self.results["s"] = (pd.unique(ps))
+        self.results["l"].append((dt, self.data.close[0], trend, ps[-1] if len(ps) > 0 else None))
+        # print(f"{self.data.datetime.date(0)} | Price={self.data[0]:.2f} | Trend={trend}")
+
+
+all_results_df, all_cerebros_objects, all_portfolio_histories = run_me(TestStrategy, 2000)
 
 
 # ==== Indicator Wrapper ====

@@ -2,7 +2,7 @@ class BounceDetector:
     def __init__(self):
         self.afterbuy = None
 
-    def detect_bounce(self, current_price, up_bounce_threshold=1.1, down_bounce_threshold=0.9):
+    def detect_bounce(self, current_price, current_time=None, up_bounce_threshold=1.1, down_bounce_threshold=0.9):
         """
         Detects meaningful bounces after the first buy.
 
@@ -18,8 +18,11 @@ class BounceDetector:
         if self.afterbuy is None:
             self.afterbuy = {
                 "min": current_price,
+                "min_time": current_time,
                 "max": current_price,
+                "max_time": current_time,
                 "extreme": current_price,  # Last extreme point (top or bottom)
+                "extreme_time": current_time,
                 "bounce_list": [],
                 "direction": None,  # "up" or "down"
             }
@@ -27,8 +30,14 @@ class BounceDetector:
         ab = self.afterbuy
 
         # === Update min/max trackers ===
-        ab["min"] = min(ab["min"], current_price)
-        ab["max"] = max(ab["max"], current_price)
+        if current_price < ab["min"]:
+            ab["min"] = current_price
+            ab["min_time"] = current_time
+        if current_price > ab["max"]:
+            ab["max"] = current_price
+            ab["max_time"] = current_time
+        # ab["min"] = min(ab["min"], current_price)
+        # ab["max"] = max(ab["max"], current_price)
 
         # === Initialize direction on first move ===
         if ab["direction"] is None:
@@ -37,6 +46,7 @@ class BounceDetector:
             elif current_price < ab["extreme"]:
                 ab["direction"] = "down"
             ab["extreme"] = current_price
+            ab["extreme_time"] = current_time
             return ab
 
         # === Track in current direction ===
@@ -44,12 +54,14 @@ class BounceDetector:
             # Update top if price goes higher
             if current_price > ab["extreme"]:
                 ab["extreme"] = current_price
+                ab["extreme_time"] = current_time
 
             # Check for downward bounce (price drops by threshold from top)
             elif current_price / ab["extreme"] <= down_bounce_threshold:
                 # Record the completed UP bounce
                 prev_bottom = ab["bounce_list"][-1]["end"] if ab["bounce_list"] else ab["min"]
                 ab["bounce_list"].append({
+                    "time": ab["extreme_time"],
                     "type": "up",
                     "start": prev_bottom,
                     "end": ab["extreme"],
@@ -58,17 +70,20 @@ class BounceDetector:
                 # Switch to down direction
                 ab["direction"] = "down"
                 ab["extreme"] = current_price
+                ab["extreme_time"] = current_time
 
         elif ab["direction"] == "down":
             # Update bottom if price goes lower
             if current_price < ab["extreme"]:
                 ab["extreme"] = current_price
+                ab["extreme_time"] = current_time
 
             # Check for upward bounce (price rises by threshold from bottom)
             elif current_price / ab["extreme"] >= up_bounce_threshold:
                 # Record the completed DOWN bounce
                 prev_top = ab["bounce_list"][-1]["end"] if ab["bounce_list"] else ab["max"]
                 ab["bounce_list"].append({
+                    "time": ab["extreme_time"],
                     "type": "down",
                     "start": prev_top,
                     "end": ab["extreme"],
@@ -77,6 +92,7 @@ class BounceDetector:
                 # Switch to up direction
                 ab["direction"] = "up"
                 ab["extreme"] = current_price
+                ab["extreme_time"] = current_time
 
         return ab
 

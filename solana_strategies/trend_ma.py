@@ -156,3 +156,71 @@ class SOL_Trend_3MA(BaseCryptoTradingStrategy):
             self.close()
             if self.p.log:
                 self.log(f"Close SHORT (alignment lost) @ {price:.2f}")
+
+
+import backtrader as bt
+
+
+class TEMA(bt.Indicator):
+    lines = ('tema',)
+    params = (('period', 20),)
+
+    def __init__(self):
+        ema1 = bt.indicators.EMA(self.data, period=self.p.period)
+        ema2 = bt.indicators.EMA(ema1, period=self.p.period)
+        ema3 = bt.indicators.EMA(ema2, period=self.p.period)
+        self.lines.tema = 3 * (ema1 - ema2) + ema3
+
+# === 3️⃣ THREE-MA ALIGNMENT ===
+class SOL_Trend_3MA(BaseCryptoTradingStrategy):
+    """
+    Solana 3-MA Alignment Strategy
+    - Enters only when all three EMAs align (short > mid > long or vice versa)
+    - Exits when alignment breaks
+    """
+
+    params = (
+        ('short_period', 10),
+        ('mid_period', 60),
+        ('long_period', 240),
+        ('log', True),
+    )
+
+    def __init__(self):
+        super().__init__()
+        self.short = bt.indicators.TEMA(self.datas[0], period=self.p.short_period)
+        self.mid = bt.indicators.TEMA(self.datas[0], period=self.p.mid_period)
+        self.long = bt.indicators.TEMA(self.datas[0], period=self.p.long_period)
+        self.order = None
+        self.risk_manager = NoneRiskManagement(self)
+
+    def _execute_trading_logic(self):
+        if self.order:
+            return
+        pos = self.getposition(self.datas[0])
+        price = self.dataclose[0]
+
+        uptrend = self.short[0] > self.mid[0] > self.long[0]
+        downtrend = self.short[0] < self.mid[0] < self.long[0]
+
+        # Entry
+        if not pos:
+            if uptrend:
+                self.order = self.buy()
+                if self.p.log:
+                    self.log(f"BUY 3-MA alignment @ {price:.2f}")
+            elif downtrend:
+                self.order = self.sell()
+                if self.p.log:
+                    self.log(f"SELL 3-MA alignment @ {price:.2f}")
+
+        # Exit
+        elif pos.size > 0 and not uptrend:
+            self.close()
+            if self.p.log:
+                self.log(f"Close LONG (alignment lost) @ {price:.2f}")
+        elif pos.size < 0 and not downtrend:
+            self.close()
+            if self.p.log:
+                self.log(f"Close SHORT (alignment lost) @ {price:.2f}")
+
