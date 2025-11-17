@@ -75,3 +75,11 @@ class BACounterAnalyzer(bt.Analyzer):
 
     def get_analysis(self):
         return self.results
+
+
+class SafeVWR(bt.analyzers.VWR):
+    def stop(self):
+        try:
+            super().stop()
+        except ZeroDivisionError:
+            self.rets['vwr'] = None

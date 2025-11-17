@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 from run_results.analys_results import read_analysers
-from run_results.custom_analyzers import BACounterAnalyzer, CashHistoryAnalyzer, TradeDurationAnalyzer
+from run_results.custom_analyzers import BACounterAnalyzer, CashHistoryAnalyzer, SafeVWR, TradeDurationAnalyzer
 from run_results.runner_config import RunConfig
 from sizers.FiboMartingaleSizer import FiboMartingaleSizer
 from strategies import FiboMartingaleStrategy
@@ -32,19 +32,6 @@ def _configure_cerebro(
     print(f"[RUN] Strategy: {strategy_class.__name__}, Params: {strategy_params}")
     cerebro.addstrategy(strategy_class, **strategy_params)
 
-    data = bt.feeds.PandasData(
-        dataname=df,
-        datetime='datetime',
-        open='open',
-        high='high',
-        low='low',
-        close='close',
-        volume='volume',
-        timeframe=bt.TimeFrame.Minutes,
-        compression=1
-    )
-    cerebro.adddata(data)
-
     def add_compression(df, c):
         data_Xm = bt.feeds.PandasData(
             dataname=df,
@@ -60,9 +47,11 @@ def _configure_cerebro(
 
         cerebro.adddata(data_Xm)
     for mtf in multi_tf:
-        if mtf == "3m":
+        if mtf == "1m":
+            add_compression(df, 1)
+        elif mtf == "3m":
             add_compression(df, 3)
-        if mtf == "5m":
+        elif mtf == "5m":
             add_compression(df, 5)
         elif mtf == "15m":
             add_compression(df, 15)
@@ -96,7 +85,7 @@ def _configure_cerebro(
     cerebro.addanalyzer(CashHistoryAnalyzer, _name='mycashvalue')         # To get CASH history
     cerebro.addanalyzer(bt.analyzers.SQN, _name='mysqn')
     cerebro.addanalyzer(bt.analyzers.Transactions, _name='mytransactions')
-    cerebro.addanalyzer(bt.analyzers.VWR, _name='myvwr')
+    cerebro.addanalyzer(SafeVWR, _name='myvwr')
     cerebro.addanalyzer(bt.analyzers.PyFolio, _name='mypyfolio')
     cerebro.addanalyzer(bt.analyzers.TimeReturn, _name='timereturns')
     cerebro.addanalyzer(bt.analyzers.AnnualReturn, _name='annualreturn')
@@ -125,7 +114,7 @@ def run_backtest_for_df(df, coin_name,
                         mcap=False,
                         print_cash_history=False,
                         runonce=True,
-                        multi_tf=["5m"]
+                        multi_tf=["1m"]
                         ):
     """
     Runs a backtest for a single DataFrame and returns results and the cerebro object.
