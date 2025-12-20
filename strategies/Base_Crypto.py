@@ -1,5 +1,7 @@
 import backtrader as bt
 
+from riskmanagers.NoneRiskManagement import NoneRiskManagement
+
 
 class BaseCryptoTradingStrategy(bt.Strategy):
     """
@@ -79,7 +81,7 @@ class BaseCryptoTradingStrategy(bt.Strategy):
         self.old_value = 0  # Initialized for notify_cashvalue
 
         # Risk management will be instantiated in derived classes
-        self.risk_manager = None
+        self.risk_manager = NoneRiskManagement(self)
         self.current_price = 0.0
         self.current_marketcap_str = ""
         self.current_volume = 0  # Initialized for FastScalperStrategy

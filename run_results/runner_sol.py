@@ -24,7 +24,9 @@ def _configure_cerebro(
     commission_class: type,
     initial_cash: float,
     is_mcap: bool,
-    multi_tf: list
+    multi_tf: list,
+    shortcash=False,
+
 ):
     """
     Helper function to configure a Backtrader Cerebro object.
@@ -71,6 +73,8 @@ def _configure_cerebro(
 
     cerebro.broker.setcash(initial_cash)
     print(f"[RUN] Not in MCAP mode. Cash: {initial_cash:.2f}")
+
+    cerebro.broker.set_shortcash(shortcash)
 
     print(f"[RUN] Commission: {commission_class.__name__}")
     cerebro.broker.addcommissioninfo(commission_class())
@@ -155,6 +159,7 @@ def run_backtest_for_df(df, coin_name,
             'final_value': cash,
         }
         return analysis_results, cerebro, []
+    print("[RUN] Cerebro Starting.")
     results = cerebro.run()
     strategy = results[0]
     print("[RUN] Cerebro Ended.")
