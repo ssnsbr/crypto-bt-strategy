@@ -7,8 +7,9 @@ import pandas as pd
 
 from run_results.analys_results import read_analysers
 from run_results.custom_analyzers import BACounterAnalyzer, CashHistoryAnalyzer, SafeVWR, TradeDurationAnalyzer
+from run_results.regime_analyser.regime_analyzer import RegimeAnalyzer
 from run_results.runner_config import RunConfig
-from sizers.FiboMartingaleSizer import FiboMartingaleSizer
+from backtrader_extended.sizers.FiboMartingaleSizer import FiboMartingaleSizer
 from strategies import FiboMartingaleStrategy
 from utils.utils import get_name
 import backtrader as bt
@@ -34,39 +35,33 @@ def _configure_cerebro(
     print(f"[RUN] Strategy: {strategy_class.__name__}, Params: {strategy_params}")
     cerebro.addstrategy(strategy_class, **strategy_params)
 
-    def add_compression(df, c):
-        data_Xm = bt.feeds.PandasData(
-            dataname=df,
-            datetime='datetime',
-            open='open',
-            high='high',
-            low='low',
-            close='close',
-            volume='volume',
-            timeframe=bt.TimeFrame.Minutes,
-            compression=c
-        )
+    tf_map = {
+        "1m": 1, "3m": 3, "5m": 5, "15m": 15,
+        "30m": 30, "1h": 60, "4h": 240, "1d": 1440,
+    }
+    # Always add the **base data first**
+    base_mtf = multi_tf[0]
+    base_c = tf_map[base_mtf]
 
-        cerebro.adddata(data_Xm)
-    for mtf in multi_tf:
-        if mtf == "1m":
-            add_compression(df, 1)
-        elif mtf == "3m":
-            add_compression(df, 3)
-        elif mtf == "5m":
-            add_compression(df, 5)
-        elif mtf == "15m":
-            add_compression(df, 15)
-        elif mtf == "30m":
-            add_compression(df, 30)
-        elif mtf == "1h":
-            add_compression(df, 60)
-        elif mtf == "4h":
-            add_compression(df, 240)
+    print("Adding base data:", base_mtf, base_c)
+    base_data = bt.feeds.PandasData(
+        dataname=df,
+        datetime='datetime',
+        open='open',
+        high='high',
+        low='low',
+        close='close',
+        volume='volume',
+        timeframe=bt.TimeFrame.Minutes,
+        compression=base_c  # always base 1m data
+    )
+    cerebro.adddata(base_data)
 
-        # cerebro.resampledata(data, timeframe=bt.TimeFrame.Minutes, compression=15)
-        # cerebro.resampledata(data, timeframe=bt.TimeFrame.Minutes, compression=60)
-
+    # Add higher timeframes using resampledata
+    for mtf in multi_tf[1:]:
+        c = tf_map[mtf]
+        print("Adding base data:", mtf, c)
+        cerebro.resampledata(base_data, timeframe=bt.TimeFrame.Minutes, compression=c)
     # REGISTER YOUR SIZER
     print(f"[RUN] Sizer: {sizer_class.__name__}, Params: {sizer_params}")
     cerebro.addsizer(sizer_class, **sizer_params)
@@ -101,6 +96,7 @@ def _configure_cerebro(
     cerebro.addanalyzer(bt.analyzers.Calmar, _name='calmar')
     cerebro.addanalyzer(TradeDurationAnalyzer, _name='mytradeduration')
     cerebro.addanalyzer(BACounterAnalyzer, _name='mybacounteranalyzer')
+    cerebro.addanalyzer(RegimeAnalyzer, _name='regime')
 
     # Add observers (for plotting later)
     cerebro.addobserver(bt.observers.Broker)
@@ -118,7 +114,8 @@ def run_backtest_for_df(df, coin_name,
                         mcap=False,
                         print_cash_history=False,
                         runonce=True,
-                        multi_tf=["1m"]
+                        multi_tf=["1m"],
+                        shortcash=False
                         ):
     """
     Runs a backtest for a single DataFrame and returns results and the cerebro object.
@@ -147,7 +144,8 @@ def run_backtest_for_df(df, coin_name,
         commission_class=commission_class,
         initial_cash=cash,
         is_mcap=mcap,
-        multi_tf=multi_tf
+        multi_tf=multi_tf,
+        shortcash=shortcash
     )
 
     print(f'[RUN] Starting backtest for {coin_name} - Initial Portfolio Value: {cerebro.broker.getvalue():.2f}')

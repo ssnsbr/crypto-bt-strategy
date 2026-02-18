@@ -1,0 +1,101 @@
+//@version=6
+strategy("Mean Distance Divergence Strategy", overlay=true, margin_long=100, margin_short=100)
+
+//=========================
+// Inputs
+//=========================
+barDist = input.int(10, "Bars between comparison", minval=2, maxval=200)
+divType = input.string("RSI", "Divergence Type", options=["RSI", "MACD", "Both"])
+tpPerc = input.float(1.0, "TP %")
+slPerc = input.float(0.5, "SL %")
+
+//=========================
+// Indicators
+//=========================
+rsi = ta.rsi(close, 14)
+
+fast = ta.ema(close, 12)
+slow = ta.ema(close, 26)
+macd = fast - slow
+
+//=========================
+// PRICE DISTANCE
+//=========================
+// Mean difference per bar
+price_now = close
+price_prev = close[barDist]
+price_mean_dist = (price_now - price_prev) / barDist
+
+//=========================
+// RSI DISTANCE
+//=========================
+rsi_now = rsi
+rsi_prev = rsi[barDist]
+rsi_mean_dist = (rsi_now - rsi_prev) / barDist
+
+//=========================
+// MACD DISTANCE
+//=========================
+macd_now = macd
+macd_prev = macd[barDist]
+macd_mean_dist = (macd_now - macd_prev) / barDist
+
+//=========================
+// Divergence Logic
+//
+// Bullish divergence =
+//   price trending DOWN but indicator trending UP
+//
+// Bearish divergence =
+//   price trending UP but indicator trending DOWN
+//=========================
+
+bull_rsi  = price_mean_dist < 0 and rsi_mean_dist  > 0
+bear_rsi  = price_mean_dist > 0 and rsi_mean_dist  < 0
+
+bull_macd = price_mean_dist < 0 and macd_mean_dist > 0
+bear_macd = price_mean_dist > 0 and macd_mean_dist < 0
+
+bull =
+     (divType == "RSI"  and bull_rsi) or
+     (divType == "MACD" and bull_macd) or
+     (divType == "Both" and bull_rsi and bull_macd)
+
+bear =
+     (divType == "RSI"  and bear_rsi) or
+     (divType == "MACD" and bear_macd) or
+     (divType == "Both" and bear_rsi and bear_macd)
+
+//=========================
+// Entries (1 trade at a time)
+//=========================
+noTrade = strategy.position_size == 0
+
+if bull and noTrade
+    strategy.entry("Long", strategy.long)
+
+if bear and noTrade
+    strategy.entry("Short", strategy.short)
+
+//=========================
+// SL / TP based on %
+//=========================
+if strategy.position_size > 0
+    sl = strategy.position_avg_price * (1 - slPerc/100)
+    tp = strategy.position_avg_price * (1 + tpPerc/100)
+    strategy.exit("LX", "Long", stop=sl, limit=tp)
+
+if strategy.position_size < 0
+    sl = strategy.position_avg_price * (1 + slPerc/100)
+    tp = strategy.position_avg_price * (1 - tpPerc/100)
+    strategy.exit("SX", "Short", stop=sl, limit=tp)
+
+//=========================
+// Debug Plots
+//=========================
+plot(price_mean_dist, "Price Mean Dist", color=color.new(color.white, 0))
+plot(rsi_mean_dist,   "RSI Mean Dist",   color=color.new(color.green, 0))
+plot(macd_mean_dist,  "MACD Mean Dist",  color=color.new(color.blue, 0))
+
+plotshape(bull, title="Bull Div", style=shape.labelup, color=color.green, text="BULL")
+plotshape(bear, title="Bear Div", style=shape.labeldown, color=color.red, text="BEAR")

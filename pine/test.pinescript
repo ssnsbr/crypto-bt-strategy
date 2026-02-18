@@ -1,0 +1,498 @@
+//@version=5
+indicator("BounceTrendIndicator (ported)", overlay=true, max_labels_count=500, max_lines_count=500)
+
+// === User inputs ===
+up_bounce_threshold    = input.float(1.01, "Up bounce multiplier (e.g. 1.01 = +1%)", step=0.001)
+down_bounce_threshold  = input.float(0.99, "Down bounce multiplier (e.g. 0.99 = -1%)", step=0.001)
+ma_period              = input.int(50, "MA period (use 0 to disable MA logic)", minval=0)
+use_ma_logic           = input.bool(true, "Use MA logic (BUMA/BDMA pivots)")
+maxItems               = input.int(200, "Max stored pivots/bounces", minval=50)
+showPivotLabels        = input.bool(true, "Show pivot labels")
+showPivotLines         = input.bool(true, "Show lines between main pivots")
+showTrendBg            = input.bool(true, "Color background by trend")
+showBounceTable        = input.bool(false, "Show recent bounce table")
+recentBounceCount      = input.int(10, "Recent bounces to show in table", minval=1)
+
+// === Constants / pivot types matching your enums ===
+P_HH   = 99
+P_HL   = 91
+P_LL   = 11
+P_LH   = 19
+P_BU   = 2
+P_BD   = 3
+P_BUMA = 21
+P_BDMA = 31
+P_START= 0
+
+TREND_UP   = 1
+TREND_DOWN = -1
+TREND_SIDE = 0
+
+DIR_WITH_TREND = 1
+DIR_CORRECTION = -1
+DIR_SIDEWAYS   = 0
+
+// === Moving average ===
+ma = ma_period > 0 ? ta.sma(close, ma_period) : na
+
+// ------------------------------
+// BounceDetector translated
+// ------------------------------
+var float bd_min_price = na
+var int   bd_min_time  = na
+var float bd_max_price = na
+var int   bd_max_time  = na
+var float bd_extreme   = na
+var int   bd_extreme_time = na
+var string bd_direction = ""   // "up" / "down" / ""
+// Bounce arrays (parallel)
+var string[] bounce_type     = array.new_string(0)
+var float[]  bounce_start    = array.new_float(0)
+var int[]    bounce_start_time = array.new_int(0)
+var float[]  bounce_end      = array.new_float(0)
+var int[]    bounce_end_time = array.new_int(0)
+var float[]  bounce_gain     = array.new_float(0)
+
+// Helper: cap arrays
+f_cap_array() =>
+    if array.size(bounce_type) > maxItems
+        // drop oldest (index 0)
+        array.shift(bounce_type)
+        array.shift(bounce_start)
+        array.shift(bounce_start_time)
+        array.shift(bounce_end)
+        array.shift(bounce_end_time)
+        array.shift(bounce_gain)
+
+// Initialize on first call if needed
+f_bd_init(_price, _time) =>
+    bd_min_price := _price
+    bd_min_time  := _time
+    bd_max_price := _price
+    bd_max_time  := _time
+    bd_extreme   := _price
+    bd_extreme_time := _time
+    bd_direction := ""
+
+// Push bounce
+f_push_bounce(_type, _s, _st, _e, _et) =>
+    array.push(bounce_type, _type)
+    array.push(bounce_start, _s)
+    array.push(bounce_start_time, _st)
+    array.push(bounce_end, _e)
+    array.push(bounce_end_time, _et)
+    array.push(bounce_gain, _e / _s - 1.0)
+    f_cap_array()
+
+// Bounce detection per tick (translated logic)
+f_detect_bounce(_price, _time) =>
+    if na(bd_min_price)
+        f_bd_init(_price, _time)
+        // return nothing else (state stored in globals)
+
+    // update min/max
+    if _price < bd_min_price
+        bd_min_price := _price
+        bd_min_time  := _time
+    if _price > bd_max_price
+        bd_max_price := _price
+        bd_max_time  := _time
+
+    // initialize direction if empty
+    if bd_direction == ""
+        if _price > bd_extreme
+            bd_direction := "up"
+        else if _price < bd_extreme
+            bd_direction := "down"
+        bd_extreme := _price
+        bd_extreme_time := _time
+        return
+
+    // track in current direction
+    if bd_direction == "up"
+        if _price > bd_extreme
+            bd_extreme := _price
+            bd_extreme_time := _time
+        else if _price / bd_extreme <= down_bounce_threshold
+            // record completed UP bounce
+            prev_bottom = array.size(bounce_end) > 0 ? array.get(bounce_end, array.size(bounce_end)-1) : bd_min_price
+            prev_bottom_time = array.size(bounce_end_time) > 0 ? array.get(bounce_end_time, array.size(bounce_end_time)-1) : bd_min_time
+            f_push_bounce("up", prev_bottom, prev_bottom_time, bd_extreme, bd_extreme_time)
+            // switch to down
+            bd_direction := "down"
+            bd_extreme := _price
+            bd_extreme_time := _time
+    else
+        // down
+        if _price < bd_extreme
+            bd_extreme := _price
+            bd_extreme_time := _time
+        else if _price / bd_extreme >= up_bounce_threshold
+            prev_top = array.size(bounce_end) > 0 ? array.get(bounce_end, array.size(bounce_end)-1) : bd_max_price
+            prev_top_time = array.size(bounce_end_time) > 0 ? array.get(bounce_end_time, array.size(bounce_end_time)-1) : bd_max_time
+            f_push_bounce("down", prev_top, prev_top_time, bd_extreme, bd_extreme_time)
+            bd_direction := "up"
+            bd_extreme := _price
+            bd_extreme_time := _time
+
+// ------------------------------
+// FindTrendByBounce translated
+// ------------------------------
+// main_structure and structure store pivots (parallel arrays)
+var int[] pivot_type_arr  = array.new_int(0)
+var float[] pivot_price_arr = array.new_float(0)
+var int[] pivot_time_arr  = array.new_int(0)
+var int[] pivot_trend_arr = array.new_int(0)  // TREND_UP/DOWN
+var int[] pivot_dir_arr   = array.new_int(0)  // DIR_WITH_TREND / DIR_CORRECTION
+
+// structure (all pivots) duplicates main_structure sometimes; maintain same arrays, but we also keep an index list of main pivots
+var int[] main_idx_arr = array.new_int(0) // indices (into pivot arrays) marking main_structure
+
+// last_processed_bounce sentinel
+var int last_processed_bounce_idx = na
+var float current_undetermined_price = na
+var string ma_cross = na  // 'above' / 'below' / na
+
+// helper to push pivot
+f_push_pivot(_type, _dir, _trend, _price, _time) =>
+    array.push(pivot_type_arr, _type)
+    array.push(pivot_dir_arr, _dir)
+    array.push(pivot_trend_arr, _trend)
+    array.push(pivot_price_arr, _price)
+    array.push(pivot_time_arr, _time)
+    // optionally push to main_structure for specific pivot types (START, HH, LL, BU, BD)
+    // In original code, main_structure gets START and HH/LL and then appended in update_bounces for p
+    // We'll append all pivots to structure, but only certain types to main_idx_arr when appropriate outside
+
+// helper: get last pivot tuple (safely)
+f_get_last_pivot() =>
+    sz = array.size(pivot_type_arr)
+    if sz == 0
+        [na, na, na, na, na]
+    else
+        idx = sz - 1
+        [ array.get(pivot_type_arr, idx),
+          array.get(pivot_dir_arr, idx),
+          array.get(pivot_trend_arr, idx),
+          array.get(pivot_price_arr, idx),
+          array.get(pivot_time_arr, idx) ]
+
+f_get_prev_pivot(n) =>
+    // n = 1 => last, n = 2 => previous_previous
+    sz = array.size(pivot_type_arr)
+    if sz < n
+        [na, na, na, na, na]
+    else
+        idx = sz - n
+        [ array.get(pivot_type_arr, idx),
+          array.get(pivot_dir_arr, idx),
+          array.get(pivot_trend_arr, idx),
+          array.get(pivot_price_arr, idx),
+          array.get(pivot_time_arr, idx) ]
+
+// _update_ma translated
+f_update_ma(_time, _price, _ma) =>
+    // Use last two main pivots for comparison
+    // previous_pivot = main_structure[-1]
+    // previous_previous_pivot = main_structure[-2]
+    if array.size(main_idx_arr) < 1
+        ma_cross := _price > _ma ? "above" : "below"
+        return
+    // compare current ma_cross and toggle
+    if ma_cross == "below" and _price > _ma
+        ma_cross := "above"
+        f_push_pivot(P_BUMA, DIR_WITH_TREND, TREND_UP, _price, _time)
+        // also add to main_idx_arr (new main pivot)
+        array.push(main_idx_arr, array.size(pivot_type_arr)-1)
+    else if ma_cross == "above" and _price < _ma
+        ma_cross := "below"
+        f_push_pivot(P_BDMA, DIR_WITH_TREND, TREND_UP, _price, _time)
+        array.push(main_idx_arr, array.size(pivot_type_arr)-1)
+
+// _update_price translated (called when bounce not new)
+f_update_price(_time, _price) =>
+    // previous_pivot = main_structure[-1]
+    // previous_previous_pivot = main_structure[-2]
+    if array.size(main_idx_arr) < 2
+        return
+    // fetch last two main pivots
+    last_main_idx = array.get(main_idx_arr, array.size(main_idx_arr)-1)
+    prev_main_idx = array.get(main_idx_arr, array.size(main_idx_arr)-2)
+    prev_pivot_type = array.get(pivot_type_arr, last_main_idx)
+    prev_prev_price = array.get(pivot_price_arr, prev_main_idx)
+    prev_price = array.get(pivot_price_arr, last_main_idx)
+
+    if prev_pivot_type == P_LL
+        if prev_prev_price < _price
+            f_push_pivot(P_BU, DIR_WITH_TREND, TREND_UP, _price, _time)
+            array.push(main_idx_arr, array.size(pivot_type_arr)-1)
+    else if prev_pivot_type == P_LH
+        if prev_price < _price
+            f_push_pivot(P_BU, DIR_WITH_TREND, TREND_UP, _price, _time)
+            array.push(main_idx_arr, array.size(pivot_type_arr)-1)
+    else if prev_pivot_type == P_HH
+        if prev_prev_price > _price
+            f_push_pivot(P_BD, DIR_WITH_TREND, TREND_DOWN, _price, _time)
+            array.push(main_idx_arr, array.size(pivot_type_arr)-1)
+    else if prev_pivot_type == P_HL
+        if prev_price > _price
+            f_push_pivot(P_BD, DIR_WITH_TREND, TREND_DOWN, _price, _time)
+            array.push(main_idx_arr, array.size(pivot_type_arr)-1)
+   // else
+        // nothing
+
+// _update_bounces translated
+f_update_bounces() =>
+    // safe guard: need at least one main pivot
+    if array.size(main_idx_arr) < 1
+        return
+    // bounce is last bounce
+    if array.size(bounce_type) == 0
+        return
+    b_idx = array.size(bounce_type)-1
+    b_type = array.get(bounce_type, b_idx)
+    b_end   = array.get(bounce_end, b_idx)
+    b_end_time = array.get(bounce_end_time, b_idx)
+
+    // get previous and previous_previous pivot as in original code using main_structure
+    if array.size(main_idx_arr) < 2
+        // not enough main pivots to decide - just append?
+        return
+
+    last_main_idx = array.get(main_idx_arr, array.size(main_idx_arr)-1)
+    prev_main_idx = array.get(main_idx_arr, array.size(main_idx_arr)-2)
+    previous_pivot_type = array.get(pivot_type_arr, last_main_idx)
+    previous_previous_price = array.get(pivot_price_arr, prev_main_idx)
+
+    var int p_type = na
+    var int p_dir  = na
+    var int p_trend= na
+
+    // replicate the branch structure
+    if previous_pivot_type == P_LL
+        if previous_previous_price <= b_end
+            p_type := P_HH
+            p_dir := DIR_WITH_TREND
+            p_trend := TREND_UP
+        else
+            p_type := P_LH
+            p_dir := DIR_CORRECTION
+            p_trend := TREND_DOWN
+
+    else if previous_pivot_type == P_LH
+        if previous_previous_price >= b_end
+            p_type := P_LL
+            p_dir := DIR_WITH_TREND
+            p_trend := TREND_DOWN
+        else
+            p_type := P_HL
+            p_dir := DIR_CORRECTION
+            p_trend := TREND_UP
+
+    else if previous_pivot_type == P_HH
+        if previous_previous_price >= b_end
+            p_type := P_LL
+            p_dir := DIR_WITH_TREND
+            p_trend := TREND_DOWN
+        else
+            p_type := P_HL
+            p_dir := DIR_CORRECTION
+            p_trend := TREND_UP
+
+    else if previous_pivot_type == P_HL
+        if previous_previous_price <= b_end
+            p_type := P_HH
+            p_dir := DIR_WITH_TREND
+            p_trend := TREND_UP
+        else
+            p_type := P_LH
+            p_dir := DIR_CORRECTION
+            p_trend := TREND_DOWN
+
+    // if p_type assigned, add
+    if not na(p_type)
+        f_push_pivot(p_type, p_dir, p_trend, b_end, b_end_time)
+        // append to main_structure
+        array.push(main_idx_arr, array.size(pivot_type_arr)-1)
+
+// update() high level: called each tick after bounce detection
+f_ft_update(_time, _price, _ma) =>
+    // if no bounces, nothing
+    if array.size(bounce_type) == 0
+        return
+
+    // if first bounce and last_processed_bounce is na -> create START and first pivot pair like original
+    if array.size(bounce_type) == 1 and na(last_processed_bounce_idx)
+        btype = array.get(bounce_type, 0)
+        bstart = array.get(bounce_start, 0)
+        bstart_time = array.get(bounce_start_time, 0)
+        bend = array.get(bounce_end, 0)
+        bend_time = array.get(bounce_end_time, 0)
+        // Save last processed index
+        last_processed_bounce_idx := 0
+        if btype == "up"
+            // push START at min(start_time, end_time) with start price
+            f_push_pivot(P_START, DIR_WITH_TREND, TREND_UP, bstart, math.min(bstart_time, bend_time))
+            array.push(main_idx_arr, array.size(pivot_type_arr)-1)
+            // push HH
+            f_push_pivot(P_HH, DIR_WITH_TREND, TREND_UP, bend, math.max(bstart_time, bend_time))
+            array.push(main_idx_arr, array.size(pivot_type_arr)-1)
+            current_undetermined_price := bend
+        else
+            f_push_pivot(P_START, DIR_WITH_TREND, TREND_DOWN, bstart, math.min(bstart_time, bend_time))
+            array.push(main_idx_arr, array.size(pivot_type_arr)-1)
+            f_push_pivot(P_LL, DIR_WITH_TREND, TREND_DOWN, bend, math.max(bstart_time, bend_time))
+            array.push(main_idx_arr, array.size(pivot_type_arr)-1)
+            current_undetermined_price := bend
+        return
+
+    // apply MA logic first
+    if use_ma_logic and not na(_ma)
+        f_update_ma(_time, _price, _ma)
+
+    // if last bounce same as last_processed -> update_price
+    latest_b_idx = array.size(bounce_type)-1
+    if not na(last_processed_bounce_idx) and last_processed_bounce_idx == latest_b_idx
+        f_update_price(_time, _price)
+        return
+    else
+        // process new bounce
+        last_processed_bounce_idx := latest_b_idx
+        // sanity check current undetermined price and bounce start mismatch (original prints a warning)
+        bstart = array.get(bounce_start, latest_b_idx)
+        if not na(current_undetermined_price) and current_undetermined_price != bstart
+            // just set it and carry on (no prints)
+            current_undetermined_price := array.get(bounce_end, latest_b_idx)
+        current_undetermined_price := array.get(bounce_end, latest_b_idx)
+        // call update_bounces
+        f_update_bounces()
+
+// ------------------------------
+// MAIN: per-bar execution
+// ------------------------------
+f_detect_bounce(close, time)
+f_ft_update(time, close, ma)
+
+// Determine latest trend value from last main pivot if available
+trend_val = 0
+if array.size(main_idx_arr) > 0
+    last_main_idx = array.get(main_idx_arr, array.size(main_idx_arr)-1)
+    last_trend = array.get(pivot_trend_arr, last_main_idx)
+    trend_val := last_trend == TREND_UP ? 1 : (last_trend == TREND_DOWN ? -1 : 0)
+else
+    trend_val := 0
+
+// plot trend as a stepped plot on the price pane (overlay)
+plot_trend = plot(trend_val == 1 ? close : na, title="Trend Up (marker)", style=plot.style_circles, linewidth=2, offset=0, display=display.none)
+plot_trend_line = plot(trend_val == 1 ? 1 : na, title="Trend", style=plot.style_columns, linewidth=2, color=color.new(color.green, 0), transp=70)
+plot_trend_line2 = plot(trend_val == -1 ? -1 : na, title="Trend Down", style=plot.style_columns, linewidth=2, color=color.new(color.red, 0), transp=70)
+plot(trend_val == 0 ? 0 : na, title="Trend Side", style=plot.style_columns, linewidth=1, color=color.new(color.gray, 70))
+
+// Background coloring
+if showTrendBg
+    bgcolor(trend_val == 1 ? color.new(color.green, 90) : (trend_val == -1 ? color.new(color.red, 90) : na))
+
+// === Plot pivots as labels and optional lines between main pivots ===
+var label[] p_labels = array.new_label(0)
+var line[] p_lines  = array.new_line(0)
+
+// cleanup excessive labels/lines
+if array.size(p_labels) > maxItems
+    // remove oldest
+    for i = 0 to array.size(p_labels) - maxItems - 1
+        lbl = array.get(p_labels, 0)
+        label.delete(lbl)
+        array.shift(p_labels)
+
+if array.size(p_lines) > maxItems
+    for i = 0 to array.size(p_lines) - maxItems - 1
+        ln = array.get(p_lines, 0)
+        line.delete(ln)
+        array.shift(p_lines)
+
+// function to create textual name from pivot type
+f_pivot_name(_t) =>
+    _t == P_HH ? "HH" :
+    _t == P_HL ? "HL" :
+    _t == P_LL ? "LL" :
+    _t == P_LH ? "LH" :
+    _t == P_BU ? "BU" :
+    _t == P_BD ? "BD" :
+    _t == P_BUMA ? "BUMA" :
+    _t == P_BDMA ? "BDMA" :
+    _t == P_START ? "START" : tostring(_t)
+
+// Create labels for pivots when new pivot added
+// We track length; when it increases we create labels/lines for the newly appended pivot(s).
+var int last_pivot_count = 0
+cur_piv_count = array.size(pivot_type_arr)
+if cur_piv_count > last_pivot_count
+    // for each new pivot index
+    for idx = last_pivot_count to cur_piv_count - 1
+        ptype = array.get(pivot_type_arr, idx)
+        pprice = array.get(pivot_price_arr, idx)
+        ptime  = array.get(pivot_time_arr, idx)
+        ptrend = array.get(pivot_trend_arr, idx)
+        pname = f_pivot_name(ptype)
+        // create label at ptime; convert ptime to bar index -> we use label.new with x=timestamp
+        if showPivotLabels
+            lbl = label.new( x = ptime, y = pprice, text = pname + "\n" + str.tostring(pprice, format.mintick), style = label.style_label_down, textcolor = color.white, size = size.tiny, tooltip = "pivot")
+            array.push(p_labels, lbl)
+        // if pivot is in main_idx_arr and we want to draw lines between main pivots
+        if showPivotLines
+            // check if this pivot is a main pivot
+            // if pivot index is equal to the last element of main_idx_arr or any thereof, connect it to previous main pivot
+            // find if idx exists in main_idx_arr
+            found = false
+            for j = 0 to array.size(main_idx_arr)-1
+                if array.get(main_idx_arr, j) == idx
+                    found := true
+            if found and array.size(main_idx_arr) >= 2
+                // find position of idx inside main_idx_arr
+                pos = na
+                for j = 0 to array.size(main_idx_arr)-1
+                    if array.get(main_idx_arr, j) == idx
+                        pos := j
+                if not na(pos) and pos > 0
+                    prev_main_idx = array.get(main_idx_arr, pos-1)
+                    x1 = array.get(pivot_time_arr, prev_main_idx)
+                    y1 = array.get(pivot_price_arr, prev_main_idx)
+                    x2 = ptime
+                    y2 = pprice
+                    ln = line.new(x1, y1, x2, y2, xloc=xloc.bar_time, extend=extend.none, width=1, color=color.new(color.yellow, 60))
+                    array.push(p_lines, ln)
+
+    last_pivot_count := cur_piv_count
+
+// Optional bounce table outputs
+var table bounceTable = na
+if showBounceTable
+    if na(bounceTable)
+        bounceTable := table.new(position.top_right, 3, recentBounceCount+1, border_width=1)
+        table.cell(bounceTable, 0, 0, "Type", bgcolor=color.gray)
+        table.cell(bounceTable, 1, 0, "Gain", bgcolor=color.gray)
+        table.cell(bounceTable, 2, 0, "End Time", bgcolor=color.gray)
+    // fill rows with latest bounces
+    rowsToShow = math.min(recentBounceCount, array.size(bounce_type))
+    for r = 0 to recentBounceCount - 1
+        // clear all
+        table.cell(bounceTable, 0, r+1, "")
+        table.cell(bounceTable, 1, r+1, "")
+        table.cell(bounceTable, 2, r+1, "")
+
+    for i = 0 to rowsToShow - 1
+        idx = array.size(bounce_type) - 1 - i
+        t = array.get(bounce_type, idx)
+        g = array.get(bounce_gain, idx)
+        et = array.get(bounce_end_time, idx)
+        // convert time to string
+        timestr = tostring(timestamp("GMT", 1970,1,1)) // placeholder (Pine doesn't have easy format function for arbitrary ms) 
+        // use built-in time formatting for label via timenow ? We'll simply show epoch ms
+        table.cell(bounceTable, 0, i+1, t)
+        table.cell(bounceTable, 1, i+1, tostring(g*100, format.percent)+"")
+        table.cell(bounceTable, 2, i+1, tostring(et))
+
+// Display MA if used
+plot(use_ma_logic and not na(ma) ? ma : na, title="SMA", linewidth=1, style=plot.style_line)
+
+// End of script

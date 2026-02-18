@@ -1,0 +1,21 @@
+//@version=5
+indicator('Kalman Filter [Loxx]', overlay = true, shorttitle="KF [Loxx]", timeframe="", timeframe_gaps=true)
+
+
+src = input(ohlc4)
+Sharpness = input.float(1.0)
+K = input.float(1.0)
+
+
+greencolor =  color.lime
+redcolor =  color.red
+
+velocity = 0.0
+kfilt = 0.0
+
+Distance = src - nz(kfilt[1], src)
+Error = nz(kfilt[1], src) + Distance * math.sqrt(Sharpness*K/ 100)
+velocity := nz(velocity[1], 0) + Distance*K / 100
+kfilt := Error + velocity
+
+plot(kfilt, color=velocity > 0 ? greencolor : redcolor, linewidth = 2)

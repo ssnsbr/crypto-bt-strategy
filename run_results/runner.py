@@ -6,12 +6,12 @@ import numpy as np
 import os
 
 import backtrader as bt
-from commissions.CustomSolanaCommission import CustomSolanaCommission
+from backtrader_extended.commissions.CustomSolanaCommission import CustomSolanaCommission
+from backtrader_extended.strategies.FiboMartingaleStrategy import FiboMartingaleStrategy
 from run_results.analys_results import read_analysers
 from run_results.custom_analyzers import BACounterAnalyzer, CashHistoryAnalyzer, TradeDurationAnalyzer
 from run_results.runner_config import RunConfig
-from sizers.FiboMartingaleSizer import FiboMartingaleSizer
-from strategies import FiboMartingaleStrategy
+from backtrader_extended.sizers.FiboMartingaleSizer import FiboMartingaleSizer
 from utils.data_utils import ready_df
 from utils.utils import get_name
 

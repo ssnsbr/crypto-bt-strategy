@@ -2,17 +2,15 @@ import os
 import numpy as np
 import pandas as pd
 
+from backtrader_extended.strategies.mbs.MBS import MBS
 from run_results.analys_results import analys
 from run_results.runner_config import RunConfig
-from sizers.ScalperMartingaleSizer import ScalperMartingaleSizer
-from strategies.BuySell20_30_INDICATOR import BaseBuySell20_30_INDICATORS
-from strategies.SimpleMartingaleStrategy import MartingaleSizer, SimpleMartingaleStrategy
-from strategies.Fibo78Once import FiboR78Once
+from backtrader_extended.strategies.SimpleMartingaleStrategy import MartingaleSizer
 
-# from strategies.MAMACDStrategy import MAMACDStrategy
-# from strategies.FastScalperStrategy import FastScalperStrategy
-# from strategies.FiboCheck import FiboChecker
-# from strategies.SimpleTest import SimpleTest
+# from backtrader_extended.strategies.MAMACDStrategy import MAMACDStrategy
+# from backtrader_extended.strategies.FastScalperStrategy import FastScalperStrategy
+# from backtrader_extended.strategies.FiboCheck import FiboChecker
+# from backtrader_extended.strategies.SimpleTest import SimpleTest
 from utils.data_utils import ready_df
 from utils.plotting_utils import plot_all_portfolio_histories, plot_all_portfolio_histories_by_time, plot_single_backtest
 from run_results.runner import run_all  # Import pandas for data preparation
@@ -64,7 +62,7 @@ if __name__ == "__main__":
     # strategy_class = FiboChecker
     # strategy_class = MAMACDStrategy
     # strategy_class = FiboR78Once
-    strategy_class = BaseBuySell20_30_INDICATORS
+    strategy_class = MBS
     strategy_params = {'data_in_market_cap': mcap, "log": log}
     sizer_class = bt.sizers.FixedSize
 

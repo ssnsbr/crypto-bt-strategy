@@ -2,7 +2,7 @@ import math
 import backtrader as bt
 
 from riskmanagers.NoneRiskManagement import NoneRiskManagement
-from strategies.Base_Crypto import BaseCryptoTradingStrategy
+from backtrader_extended.strategies.Base_Crypto import BaseCryptoTradingStrategy
 
 class ZigZagTrend(bt.Indicator):
     """

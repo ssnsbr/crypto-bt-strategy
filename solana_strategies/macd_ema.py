@@ -1,7 +1,7 @@
 from riskmanagers.NoneRiskManagement import NoneRiskManagement
 import backtrader as bt
 
-from strategies.Base_Crypto import BaseCryptoTradingStrategy
+from backtrader_extended.strategies.Base_Crypto import BaseCryptoTradingStrategy
 
 
 class SOL_EMA_MACD_LongShort(BaseCryptoTradingStrategy):

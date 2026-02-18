@@ -21,6 +21,8 @@ def read_analysers(strategy):
     won_pnl = trade_data.get('won', {}).get('pnl', {}).get('total', 0)
     lost_pnl = trade_data.get('lost', {}).get('pnl', {}).get('total', 0)
     print(trade_data)
+    # regime_data = strategy.analyzers.regime.get_analysis()
+    # print(regime_data)
     mcap_supply = 1_000_000_000
     # Build result dictionary
     analysis_results = {
@@ -126,6 +128,7 @@ def read_analysers(strategy):
         'trade_duration_max': duration_data.get('max', 0),
         'trade_duration_std': duration_data.get('std', 0),
         'trade_duration_count': duration_data.get('count', 0),
+        # 'regime_data': regime_data
     }
     # counter_data:
     # [RUN]  ib_count 0

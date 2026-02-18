@@ -1,0 +1,1306 @@
+//@version=5
+indicator(title = 'MTF Candle Multi Hub', shorttitle = 'MTF Candle Multi Hub', overlay = true, max_lines_count = 500, max_boxes_count = 250, dynamic_requests=true)
+
+
+//コードここから
+
+//入力設定
+var string CANDLE_GROUP = 'CANDLE SETTINGS ON/OFF'
+// ローソク足のオンオフ機能
+var bool enableCandles5M = input.bool(false, title="5M Candle ON/OFF", group = CANDLE_GROUP)
+
+
+// 平均足のローソク足のオンオフ機能
+var string HEIKIN_ASHI_CANDLE_GROUP = 'Heikin Ashi CANDLE SETTINGS ON/OFF'
+// Heikin Ashi Candle ON/OFF
+showHeikinAshi = input(false, title="1M Heikin Ashi Candle ON/OFF", group = HEIKIN_ASHI_CANDLE_GROUP)
+// 全ての時間足で表示するかどうか
+displayOnAllTimeframes = input.bool(false, title="(View Heikin Ashi in all time frames)", group = HEIKIN_ASHI_CANDLE_GROUP, tooltip=" Valid only if 1M Heikin Ashi Candle ON\n【1M Heikin Ashi Candle ONの場合のみ有効】")
+
+
+
+
+// ZigZagラインの表示/非表示を制御するチェックボックス
+var string ZigZag_GROUP = 'ZigZag SETTINGS ON/OFF'
+
+
+showLine2 = input.bool(false, "■■【ZigZag 1 ON/OFF】■■", group = ZigZag_GROUP, tooltip="Detailed settings for ZigZag can be found below【ZigZagの詳細設定は下方にあります】")
+showLine1 = input.bool(false, "■■【ZigZag 2 ON/OFF】■■", group = ZigZag_GROUP)
+//
+// MA設定ここから
+show_ma1 = input.bool(title="Show MA1", defval=false)
+show_ma2 = input.bool(title="Show MA2", defval=false)
+show_ma3 = input.bool(title="Show MA3", defval=false)
+show_ma4 = input.bool(title="Show MA4", defval=false)
+
+// 色のON/OFF設定
+fill_color = input.bool(title="Show MA Cloud ON/OFF【MA間の色】", defval=false)
+
+ma_type1 = input.string(title="MA1 Type", defval="EMA", options=["EMA", "SMA"], inline="MA1")
+ma_periods1 = input.int(title="　MA1 Period", defval=10, inline="MA1")
+ma_type2 = input.string(title="MA2 Type", defval="EMA", options=["EMA", "SMA"], inline="MA2")
+ma_periods2 = input.int(title="　MA2 Period", defval=20, inline="MA2")
+ma_type3 = input.string(title="MA3 Type", defval="EMA", options=["EMA", "SMA"], inline="MA3")
+ma_periods3 = input.int(title="　MA3 Period", defval=75, inline="MA3")
+ma_type4 = input.string(title="MA4 Type", defval="EMA", options=["EMA", "SMA"], inline="MA4")
+ma_periods4 = input.int(title="　MA4 Period", defval=200, inline="MA4")
+
+// MA計算
+ma1 = ma_type1 == "EMA" ? ta.ema(close, ma_periods1) : ta.sma(close, ma_periods1)
+ma2 = ma_type2 == "EMA" ? ta.ema(close, ma_periods2) : ta.sma(close, ma_periods2)
+ma3 = ma_type3 == "EMA" ? ta.ema(close, ma_periods3) : ta.sma(close, ma_periods3)
+ma4 = ma_type4 == "EMA" ? ta.ema(close, ma_periods4) : ta.sma(close, ma_periods4)
+
+// プロット
+p1 = plot(show_ma1 ? ma1 : na, color=#000000, linewidth=2, title="MA1")
+
+// MA2の色を上昇・下降で変更
+ma2_color = ma2 > ma2[1] ? color.rgb(35, 150, 140) : color.rgb(255, 45, 38)
+p2 = plot(show_ma2 ? ma2 : na, color=ma2_color, linewidth=2, title="MA2")
+
+p3 = plot(show_ma3 ? ma3 : na, color=color.blue, linewidth=2, title="MA3")
+p4 = plot(show_ma4 ? ma4 : na, color=#000000, linewidth=2, title="MA4")
+
+// MAプラス設定ここから
+// 移動平均線の間に色をつける
+fill(p3, p4, color=fill_color ? (ma3 > ma4 ? color.new(color.green, 80) : color.new(color.red, 80)) : na)
+fill(p2, p3, color=fill_color ? (ma2 > ma3 ? color.new(color.green, 80) : color.new(color.red, 80)) : na)
+fill(p1, p2, color=fill_color ? (ma1 > ma2 ? color.new(color.green, 80) : color.new(color.red, 80)) : na)
+// MAプラス設定ここまで
+// MA設定ここまで
+
+
+
+
+// スタイルタブに表示されるカラー設定
+color bullBodyColor1H = input.color(color.new(color.green, 90), title="▲ Body", group="1H COLOR———————————————————————", inline="bullColors1H")
+color bullBorderColor1H = input.color(color.green, title="▲ Border", group="1H COLOR———————————————————————", inline="bullColors1H")
+color bearBodyColor1H = input.color(color.new(color.red, 90), title="▼ Body", group="1H COLOR———————————————————————", inline="bearColors1H")
+color bearBorderColor1H = input.color(color.red, title="▼ Border", group="1H COLOR———————————————————————", inline="bearColors1H")
+
+//グローバル変数 
+var box realtimeCandleBody = na
+var line realtimeCandleUpperWick = na
+var line realtimeCandleLowerWick = na
+
+var int candleBodyLeftBarIndex = bar_index
+var int candleBodyRightBarIndex = na
+var int candleBodyMidpointBarIndex = na
+
+var color candleBodyColor = na
+var color candleBorderColor = na
+
+// 固定の設定値
+var int BORDER_WIDTH = 1  // 枠の太さ
+var int WICK_WIDTH = 2     // ひげの太さ
+
+//関数
+determineDirectionColor(bool _isFalling, bool _isRising, color _fallingColor, color _risingColor) =>
+    _isFalling ? _fallingColor :
+     _isRising ? _risingColor :
+     na
+
+calculateCandleBodyMidpointBarIndex(int _projectedRightBarIndex)=>
+    candleBodyLeftBarIndex + math.ceil( ( _projectedRightBarIndex - candleBodyLeftBarIndex ) / 2 )
+
+reduceFutureBarIndexToMaximum(int _proposedFutureBarIndex)=>
+    ( _proposedFutureBarIndex - last_bar_index > 500 ) ?  last_bar_index + 500 : _proposedFutureBarIndex
+
+//インジケーター設定
+
+
+// コードここから5分足
+
+//入力設定
+var string CANDLE_GROUP_5M = '5M CANDLE SETTINGS'
+// 5分足のローソク足のオンオフ機能を追加
+
+
+var string CANDLE_COLOR_GROUP_5M = '5M COLOR'
+// 5分足の色の配置設定
+var color bullBodyColor5M = input.color(color.new(color.green, 90), title="▲ Body", inline="bullColors5M", group=CANDLE_COLOR_GROUP_5M)
+var color bullBorderColor5M = input.color(color.green, title="▲ Border", inline="bullColors5M", group=CANDLE_COLOR_GROUP_5M)
+var color bearBodyColor5M = input.color(color.new(color.red, 90), title="▼ Body", inline="bearColors5M", group=CANDLE_COLOR_GROUP_5M)
+var color bearBorderColor5M = input.color(color.red, title="▼ Border", inline="bearColors5M", group=CANDLE_COLOR_GROUP_5M)
+
+//グローバル変数 
+var box realtimeCandleBody5M = na
+var line realtimeCandleUpperWick5M = na
+var line realtimeCandleLowerWick5M = na
+
+var int candleBodyLeftBarIndex5M = bar_index
+var int candleBodyRightBarIndex5M = na
+var int candleBodyMidpointBarIndex5M = na
+
+var color candleBodyColor5M = na
+var color candleBorderColor5M = na
+
+//インジケーター設定
+var string securitySymbol5M = syminfo.tickerid
+var string securityTimeframe5M = "5"
+
+[htfOpen5M, htfHigh5M, htfLow5M, htfClose5M, htfTime5M, htfTimeClose5M] = request.security(symbol = securitySymbol5M, timeframe = securityTimeframe5M, expression = [open, high, low, close, time, time_close], lookahead = barmerge.lookahead_on)
+
+bool isTimeframeChanged5M = timeframe.change(securityTimeframe5M)
+
+if isTimeframeChanged5M
+    candleBodyLeftBarIndex5M := bar_index
+    candleBodyRightBarIndex5M := reduceFutureBarIndexToMaximum(candleBodyLeftBarIndex5M + int((htfTimeClose5M - htfTime5M) / (time_close - time)))
+    candleBodyMidpointBarIndex5M := calculateCandleBodyMidpointBarIndex(candleBodyRightBarIndex5M)
+//end if
+
+float candleBodyTop5M = math.max(htfOpen5M, htfClose5M)
+float candleBodyBottom5M = math.min(htfOpen5M, htfClose5M)
+
+bool isFalling5M = htfOpen5M > htfClose5M
+bool isRising5M = htfOpen5M < htfClose5M
+
+// 枠とひげの色
+candleBorderColor5M := determineDirectionColor(isFalling5M, isRising5M, bearBorderColor5M, bullBorderColor5M)
+candleBodyColor5M := determineDirectionColor(isFalling5M, isRising5M, bearBodyColor5M, bullBodyColor5M)
+
+if enableCandles5M  // 5分足のローソク足が有効な場合のみ描画
+    if isTimeframeChanged5M
+        realtimeCandleBody5M := box.new(left = candleBodyLeftBarIndex5M, top = candleBodyTop5M, right = candleBodyRightBarIndex5M, bottom = candleBodyBottom5M, bgcolor = candleBodyColor5M, border_color = candleBorderColor5M, border_width = BORDER_WIDTH)
+    else
+        box.set_border_color(realtimeCandleBody5M, candleBorderColor5M)
+        box.set_bgcolor(realtimeCandleBody5M, candleBodyColor5M)
+        box.set_top(realtimeCandleBody5M, candleBodyTop5M)
+        box.set_bottom(realtimeCandleBody5M, candleBodyBottom5M)
+
+
+// ひげの描画
+if enableCandles5M
+    if isTimeframeChanged5M
+        // 上ひげの描画
+        realtimeCandleUpperWick5M := line.new(x1 = bar_index, y1 = htfHigh5M, x2 = bar_index, y2 = candleBodyTop5M, color = candleBorderColor5M, width = WICK_WIDTH)
+
+        // 下ひげの描画
+        realtimeCandleLowerWick5M := line.new(x1 = bar_index, y1 = candleBodyBottom5M, x2 = bar_index, y2 = htfLow5M, color = candleBorderColor5M, width = WICK_WIDTH)
+    else
+        // 既存のひげを更新
+        line.set_color(realtimeCandleUpperWick5M, candleBorderColor5M)
+        line.set_y1(realtimeCandleUpperWick5M, htfHigh5M)
+        line.set_y2(realtimeCandleUpperWick5M, candleBodyTop5M)
+        line.set_x1(realtimeCandleUpperWick5M, bar_index)
+        line.set_x2(realtimeCandleUpperWick5M, bar_index)
+
+        line.set_color(realtimeCandleLowerWick5M, candleBorderColor5M)
+        line.set_y1(realtimeCandleLowerWick5M, candleBodyBottom5M)
+        line.set_y2(realtimeCandleLowerWick5M, htfLow5M)
+        line.set_x1(realtimeCandleLowerWick5M, bar_index)
+        line.set_x2(realtimeCandleLowerWick5M, bar_index)
+else
+    // ひげを非表示にする
+    if not na(realtimeCandleUpperWick5M)
+        line.delete(realtimeCandleUpperWick5M)
+    if not na(realtimeCandleLowerWick5M)
+        line.delete(realtimeCandleLowerWick5M)
+
+// コードここまで5分足
+
+/// コードここから15分足
+
+//入力設定
+var string CANDLE_GROUP_15M = '15M CANDLE SETTINGS'
+// 15分足のローソク足のオンオフ機能を追加
+var bool enableCandles15M = input.bool(false, title="15M Candle ON/OFF", group = CANDLE_GROUP)
+
+var string CANDLE_COLOR_GROUP_15M = '15M COLOR'
+// 15分足の色の配置設定
+var color bullBodyColor15M = input.color(color.new(color.green, 90), title="▲ Body", inline="bullColors15M", group=CANDLE_COLOR_GROUP_15M)
+var color bullBorderColor15M = input.color(color.green, title="▲ Border", inline="bullColors15M", group=CANDLE_COLOR_GROUP_15M)
+var color bearBodyColor15M = input.color(color.new(color.red, 90), title="▼ Body", inline="bearColors15M", group=CANDLE_COLOR_GROUP_15M)
+var color bearBorderColor15M = input.color(color.red, title="▼ Border", inline="bearColors15M", group=CANDLE_COLOR_GROUP_15M)
+
+//グローバル変数 
+var box realtimeCandleBody15M = na
+var line realtimeCandleUpperWick15M = na
+var line realtimeCandleLowerWick15M = na
+
+var int candleBodyLeftBarIndex15M = bar_index
+var int candleBodyRightBarIndex15M = na
+var int candleBodyMidpointBarIndex15M = na
+
+var color candleBodyColor15M = na
+var color candleBorderColor15M = na
+
+//インジケーター設定
+var string securitySymbol15M = syminfo.tickerid
+var string securityTimeframe15M = "15"
+
+[htfOpen15M, htfHigh15M, htfLow15M, htfClose15M, htfTime15M, htfTimeClose15M] = request.security(symbol = securitySymbol15M, timeframe = securityTimeframe15M, expression = [open, high, low, close, time, time_close], lookahead = barmerge.lookahead_on)
+
+bool isTimeframeChanged15M = timeframe.change(securityTimeframe15M)
+
+if isTimeframeChanged15M
+    candleBodyLeftBarIndex15M := bar_index
+    candleBodyRightBarIndex15M := reduceFutureBarIndexToMaximum(candleBodyLeftBarIndex15M + int((htfTimeClose15M - htfTime15M) / (time_close - time)))
+    candleBodyMidpointBarIndex15M := calculateCandleBodyMidpointBarIndex(candleBodyRightBarIndex15M)
+//end if
+
+float candleBodyTop15M = math.max(htfOpen15M, htfClose15M)
+float candleBodyBottom15M = math.min(htfOpen15M, htfClose15M)
+
+bool isFalling15M = htfOpen15M > htfClose15M
+bool isRising15M = htfOpen15M < htfClose15M
+
+// 枠とひげの色
+candleBorderColor15M := determineDirectionColor(isFalling15M, isRising15M, bearBorderColor15M, bullBorderColor15M)
+candleBodyColor15M := determineDirectionColor(isFalling15M, isRising15M, bearBodyColor15M, bullBodyColor15M)
+
+if enableCandles15M  // 15分足のローソク足が有効な場合のみ描画
+    if isTimeframeChanged15M
+        realtimeCandleBody15M := box.new(left = candleBodyLeftBarIndex15M, top = candleBodyTop15M, right = candleBodyRightBarIndex15M, bottom = candleBodyBottom15M, bgcolor = candleBodyColor15M, border_color = candleBorderColor15M, border_width = BORDER_WIDTH)
+    else
+        box.set_border_color(realtimeCandleBody15M, candleBorderColor15M)
+        box.set_bgcolor(realtimeCandleBody15M, candleBodyColor15M)
+        box.set_top(realtimeCandleBody15M, candleBodyTop15M)
+        box.set_bottom(realtimeCandleBody15M, candleBodyBottom15M)
+
+
+// ひげの描画
+if enableCandles15M
+    if isTimeframeChanged15M
+        // 上ひげの描画
+        realtimeCandleUpperWick15M := line.new(x1 = bar_index, y1 = htfHigh15M, x2 = bar_index, y2 = candleBodyTop15M, color = candleBorderColor15M, width = WICK_WIDTH)
+
+        // 下ひげの描画
+        realtimeCandleLowerWick15M := line.new(x1 = bar_index, y1 = candleBodyBottom15M, x2 = bar_index, y2 = htfLow15M, color = candleBorderColor15M, width = WICK_WIDTH)
+    else
+        // 既存のひげを更新
+        line.set_color(realtimeCandleUpperWick15M, candleBorderColor15M)
+        line.set_y1(realtimeCandleUpperWick15M, htfHigh15M)
+        line.set_y2(realtimeCandleUpperWick15M, candleBodyTop15M)
+        line.set_x1(realtimeCandleUpperWick15M, bar_index)
+        line.set_x2(realtimeCandleUpperWick15M, bar_index)
+
+        line.set_color(realtimeCandleLowerWick15M, candleBorderColor15M)
+        line.set_y1(realtimeCandleLowerWick15M, candleBodyBottom15M)
+        line.set_y2(realtimeCandleLowerWick15M, htfLow15M)
+        line.set_x1(realtimeCandleLowerWick15M, bar_index)
+        line.set_x2(realtimeCandleLowerWick15M, bar_index)
+
+// コードここまで15分足
+
+//コードここから１時間足
+
+var bool enableCandles = input.bool(true, title="1H Candle ON/OFF", group = CANDLE_GROUP)
+var string securitySymbol = syminfo.tickerid
+var string securityTimeframe = "60"
+
+[htfOpen, htfHigh, htfLow, htfClose, htfTime, htfTimeClose] = request.security(symbol = securitySymbol, timeframe = securityTimeframe,expression = [open, high, low, close, time, time_close], lookahead = barmerge.lookahead_on)
+
+bool isTimeframeChanged = timeframe.change(securityTimeframe)
+
+if isTimeframeChanged
+    candleBodyLeftBarIndex := bar_index
+    candleBodyRightBarIndex := reduceFutureBarIndexToMaximum(candleBodyLeftBarIndex + int((htfTimeClose - htfTime) / (time_close - time)))
+    candleBodyMidpointBarIndex := calculateCandleBodyMidpointBarIndex(candleBodyRightBarIndex)
+//end if
+
+float candleBodyTop = math.max(htfOpen, htfClose)
+float candleBodyBottom = math.min(htfOpen, htfClose)
+
+bool isFalling = htfOpen > htfClose
+bool isRising = htfOpen < htfClose
+
+// 枠とひげの色
+candleBorderColor := determineDirectionColor(isFalling, isRising, bearBorderColor1H, bullBorderColor1H)
+candleBodyColor := determineDirectionColor(isFalling, isRising, bearBodyColor1H, bullBodyColor1H)
+
+if enableCandles  // ローソク足が有効な場合のみ描画
+    if isTimeframeChanged
+        realtimeCandleBody := box.new(left = candleBodyLeftBarIndex, top = candleBodyTop, right = candleBodyRightBarIndex, bottom = candleBodyBottom,bgcolor = candleBodyColor, border_color = candleBorderColor, border_width = BORDER_WIDTH)
+    else
+        box.set_border_color(realtimeCandleBody, candleBorderColor)
+        box.set_bgcolor(realtimeCandleBody, candleBodyColor)
+        box.set_top(realtimeCandleBody, candleBodyTop)
+        box.set_bottom(realtimeCandleBody, candleBodyBottom)
+
+    // ひげの描画
+    if isTimeframeChanged
+        realtimeCandleUpperWick := line.new(x1 = candleBodyMidpointBarIndex, y1 = htfHigh,          x2 = candleBodyMidpointBarIndex, y2 = candleBodyTop, color = candleBorderColor, width = WICK_WIDTH)
+        realtimeCandleLowerWick := line.new(x1 = candleBodyMidpointBarIndex, y1 = candleBodyBottom, x2 = candleBodyMidpointBarIndex, y2 = htfLow,        color = candleBorderColor, width = WICK_WIDTH)
+    else
+        line.set_color(realtimeCandleUpperWick, candleBorderColor)
+        line.set_y1(realtimeCandleUpperWick, htfHigh)
+        line.set_y2(realtimeCandleUpperWick, candleBodyTop)
+        line.set_color(realtimeCandleLowerWick, candleBorderColor)
+        line.set_y1(realtimeCandleLowerWick, candleBodyBottom)
+        line.set_y2(realtimeCandleLowerWick, htfLow)
+
+//コード1時間足ここまで
+//コードここから4時間足
+
+//入力設定
+var string CANDLE_GROUP_4H = '4H CANDLE SETTINGS'
+// 4時間足のローソク足のオンオフ機能を追加
+var bool enableCandles4H = input.bool(false, title="4H Candle ON/OFF", group = CANDLE_GROUP)
+
+var string CANDLE_COLOR_GROUP_4H = '4H COLOR'
+// 4時間足の色の配置設定
+var color bullBodyColor4H = input.color(color.new(color.green, 90), title="▲ Body", inline="bullColors4H", group=CANDLE_COLOR_GROUP_4H)
+var color bullBorderColor4H = input.color(color.green, title="▲ Border", inline="bullColors4H", group=CANDLE_COLOR_GROUP_4H)
+var color bearBodyColor4H = input.color(color.new(color.red, 90), title="▼ Body", inline="bearColors4H", group=CANDLE_COLOR_GROUP_4H)
+var color bearBorderColor4H = input.color(color.red, title="▼ Border", inline="bearColors4H", group=CANDLE_COLOR_GROUP_4H)
+
+//グローバル変数 
+var box realtimeCandleBody4H = na
+var line realtimeCandleUpperWick4H = na
+var line realtimeCandleLowerWick4H = na
+
+var int candleBodyLeftBarIndex4H = bar_index
+var int candleBodyRightBarIndex4H = na
+var int candleBodyMidpointBarIndex4H = na
+
+var color candleBodyColor4H = na
+var color candleBorderColor4H = na
+
+//インジケーター設定
+var string securitySymbol4H = syminfo.tickerid
+var string securityTimeframe4H = "240"
+
+[htfOpen4H, htfHigh4H, htfLow4H, htfClose4H, htfTime4H, htfTimeClose4H] = request.security(symbol = securitySymbol4H, timeframe = securityTimeframe4H, expression = [open, high, low, close, time, time_close], lookahead = barmerge.lookahead_on)
+
+bool isTimeframeChanged4H = timeframe.change(securityTimeframe4H)
+
+if isTimeframeChanged4H
+    candleBodyLeftBarIndex4H := bar_index
+    candleBodyRightBarIndex4H := reduceFutureBarIndexToMaximum(candleBodyLeftBarIndex4H + int((htfTimeClose4H - htfTime4H) / (time_close - time)))
+    candleBodyMidpointBarIndex4H := calculateCandleBodyMidpointBarIndex(candleBodyRightBarIndex4H)
+//end if
+
+float candleBodyTop4H = math.max(htfOpen4H, htfClose4H)
+float candleBodyBottom4H = math.min(htfOpen4H, htfClose4H)
+
+bool isFalling4H = htfOpen4H > htfClose4H
+bool isRising4H = htfOpen4H < htfClose4H
+
+// 枠とひげの色
+candleBorderColor4H := determineDirectionColor(isFalling4H, isRising4H, bearBorderColor4H, bullBorderColor4H)
+candleBodyColor4H := determineDirectionColor(isFalling4H, isRising4H, bearBodyColor4H, bullBodyColor4H)
+
+if enableCandles4H  // 4時間足のローソク足が有効な場合のみ描画
+    if isTimeframeChanged4H
+        realtimeCandleBody4H := box.new(left = candleBodyLeftBarIndex4H, top = candleBodyTop4H, right = candleBodyRightBarIndex4H, bottom = candleBodyBottom4H, bgcolor = candleBodyColor4H, border_color = candleBorderColor4H, border_width = BORDER_WIDTH)
+    else
+        box.set_border_color(realtimeCandleBody4H, candleBorderColor4H)
+        box.set_bgcolor(realtimeCandleBody4H, candleBodyColor4H)
+        box.set_top(realtimeCandleBody4H, candleBodyTop4H)
+        box.set_bottom(realtimeCandleBody4H, candleBodyBottom4H)
+
+    // ひげの描画
+    if isTimeframeChanged4H
+        realtimeCandleUpperWick4H := line.new(x1 = candleBodyMidpointBarIndex4H, y1 = htfHigh4H,          x2 = candleBodyMidpointBarIndex4H, y2 = candleBodyTop4H, color = candleBorderColor4H, width = WICK_WIDTH)
+        realtimeCandleLowerWick4H := line.new(x1 = candleBodyMidpointBarIndex4H, y1 = candleBodyBottom4H, x2 = candleBodyMidpointBarIndex4H, y2 = htfLow4H,        color = candleBorderColor4H, width = WICK_WIDTH)
+    else
+        line.set_color(realtimeCandleUpperWick4H, candleBorderColor4H)
+        line.set_y1(realtimeCandleUpperWick4H, htfHigh4H)
+        line.set_y2(realtimeCandleUpperWick4H, candleBodyTop4H)
+        line.set_color(realtimeCandleLowerWick4H, candleBorderColor4H)
+        line.set_y1(realtimeCandleLowerWick4H, candleBodyBottom4H)
+        line.set_y2(realtimeCandleLowerWick4H, htfLow4H)
+
+//コードここまで4時間足
+//コードここから日足
+
+//入力設定
+var string CANDLE_GROUP_D = 'Daily CANDLE SETTINGS'
+// 日足のローソク足のオンオフ機能を追加
+var bool enableCandlesD = input.bool(false, title="Daily Candle ON/OFF", group = CANDLE_GROUP)
+
+var string CANDLE_COLOR_GROUP_D = 'Daily COLOR'
+// 日足の色の配置設定
+var color bullBodyColorD = input.color(color.new(color.green, 90), title="▲ Body", inline="bullColorsD", group=CANDLE_COLOR_GROUP_D)
+var color bullBorderColorD = input.color(color.green, title="▲ Border", inline="bullColorsD", group=CANDLE_COLOR_GROUP_D)
+var color bearBodyColorD = input.color(color.new(color.red, 90), title="▼ Body", inline="bearColorsD", group=CANDLE_COLOR_GROUP_D)
+var color bearBorderColorD = input.color(color.red, title="▼ Border", inline="bearColorsD", group=CANDLE_COLOR_GROUP_D)
+
+//グローバル変数 
+var box realtimeCandleBodyD = na
+var line realtimeCandleUpperWickD = na
+var line realtimeCandleLowerWickD = na
+
+var int candleBodyLeftBarIndexD = bar_index
+var int candleBodyRightBarIndexD = na
+var int candleBodyMidpointBarIndexD = na
+
+var color candleBodyColorD = na
+var color candleBorderColorD = na
+
+//インジケーター設定
+var string securitySymbolD = syminfo.tickerid
+var string securityTimeframeD = "D"
+
+[htfOpenD, htfHighD, htfLowD, htfCloseD, htfTimeD, htfTimeCloseD] = request.security(symbol = securitySymbolD, timeframe = securityTimeframeD, expression = [open, high, low, close, time, time_close], lookahead = barmerge.lookahead_on)
+
+bool isTimeframeChangedD = timeframe.change(securityTimeframeD)
+
+if isTimeframeChangedD
+    candleBodyLeftBarIndexD := bar_index
+    candleBodyRightBarIndexD := reduceFutureBarIndexToMaximum(candleBodyLeftBarIndexD + int((htfTimeCloseD - htfTimeD) / (time_close - time)))
+    candleBodyMidpointBarIndexD := calculateCandleBodyMidpointBarIndex(candleBodyRightBarIndexD)
+//end if
+
+float candleBodyTopD = math.max(htfOpenD, htfCloseD)
+float candleBodyBottomD = math.min(htfOpenD, htfCloseD)
+
+bool isFallingD = htfOpenD > htfCloseD
+bool isRisingD = htfOpenD < htfCloseD
+
+// 枠とひげの色
+candleBorderColorD := determineDirectionColor(isFallingD, isRisingD, bearBorderColorD, bullBorderColorD)
+candleBodyColorD := determineDirectionColor(isFallingD, isRisingD, bearBodyColorD, bullBodyColorD)
+
+if enableCandlesD  // 日足のローソク足が有効な場合のみ描画
+    if isTimeframeChangedD
+        realtimeCandleBodyD := box.new(left = candleBodyLeftBarIndexD, top = candleBodyTopD, right = candleBodyRightBarIndexD, bottom = candleBodyBottomD, bgcolor = candleBodyColorD, border_color = candleBorderColorD, border_width = BORDER_WIDTH)
+    else
+        box.set_border_color(realtimeCandleBodyD, candleBorderColorD)
+        box.set_bgcolor(realtimeCandleBodyD, candleBodyColorD)
+        box.set_top(realtimeCandleBodyD, candleBodyTopD)
+        box.set_bottom(realtimeCandleBodyD, candleBodyBottomD)
+
+    // ひげの描画
+    if isTimeframeChangedD
+        realtimeCandleUpperWickD := line.new(x1 = candleBodyMidpointBarIndexD, y1 = htfHighD,          x2 = candleBodyMidpointBarIndexD, y2 = candleBodyTopD, color = candleBorderColorD, width = WICK_WIDTH)
+        realtimeCandleLowerWickD := line.new(x1 = candleBodyMidpointBarIndexD, y1 = candleBodyBottomD, x2 = candleBodyMidpointBarIndexD, y2 = htfLowD,        color = candleBorderColorD, width = WICK_WIDTH)
+    else
+        line.set_color(realtimeCandleUpperWickD, candleBorderColorD)
+        line.set_y1(realtimeCandleUpperWickD, htfHighD)
+        line.set_y2(realtimeCandleUpperWickD, candleBodyTopD)
+        line.set_color(realtimeCandleLowerWickD, candleBorderColorD)
+        line.set_y1(realtimeCandleLowerWickD, candleBodyBottomD)
+        line.set_y2(realtimeCandleLowerWickD, htfLowD)
+
+//コードここまで日足
+//コードここから週足
+
+//入力設定
+var string CANDLE_GROUP_W = 'Weekly CANDLE SETTINGS'
+// 週足のローソク足のオンオフ機能を追加
+var bool enableCandlesW = input.bool(false, title="Weekly Candle ON/OFF", group = CANDLE_GROUP)
+
+var string CANDLE_COLOR_GROUP_W = 'Weekly COLOR'
+// 週足の色の配置設定
+var color bullBodyColorW = input.color(color.new(color.green, 90), title="▲ Body", inline="bullColorsW", group=CANDLE_COLOR_GROUP_W)
+var color bullBorderColorW = input.color(color.green, title="▲ Border", inline="bullColorsW", group=CANDLE_COLOR_GROUP_W)
+var color bearBodyColorW = input.color(color.new(color.red, 90), title="▼ Body", inline="bearColorsW", group=CANDLE_COLOR_GROUP_W)
+var color bearBorderColorW = input.color(color.red, title="▼ Border", inline="bearColorsW", group=CANDLE_COLOR_GROUP_W)
+
+//グローバル変数 
+var box realtimeCandleBodyW = na
+var line realtimeCandleUpperWickW = na
+var line realtimeCandleLowerWickW = na
+
+var int candleBodyLeftBarIndexW = bar_index
+var int candleBodyRightBarIndexW = na
+var int candleBodyMidpointBarIndexW = na
+
+var color candleBodyColorW = na
+var color candleBorderColorW = na
+
+//インジケーター設定
+var string securitySymbolW = syminfo.tickerid
+var string securityTimeframeW = "W"
+
+[htfOpenW, htfHighW, htfLowW, htfCloseW, htfTimeW, htfTimeCloseW] = request.security(symbol = securitySymbolW, timeframe = securityTimeframeW, expression = [open, high, low, close, time, time_close], lookahead = barmerge.lookahead_on)
+
+bool isTimeframeChangedW = timeframe.change(securityTimeframeW)
+
+if isTimeframeChangedW
+    candleBodyLeftBarIndexW := bar_index
+    candleBodyRightBarIndexW := reduceFutureBarIndexToMaximum(candleBodyLeftBarIndexW + int((htfTimeCloseW - htfTimeW) / (time_close - time)))
+    candleBodyMidpointBarIndexW := calculateCandleBodyMidpointBarIndex(candleBodyRightBarIndexW)
+//end if
+
+float candleBodyTopW = math.max(htfOpenW, htfCloseW)
+float candleBodyBottomW = math.min(htfOpenW, htfCloseW)
+
+bool isFallingW = htfOpenW > htfCloseW
+bool isRisingW = htfOpenW < htfCloseW
+
+// 枠とひげの色
+candleBorderColorW := determineDirectionColor(isFallingW, isRisingW, bearBorderColorW, bullBorderColorW)
+candleBodyColorW := determineDirectionColor(isFallingW, isRisingW, bearBodyColorW, bullBodyColorW)
+
+if enableCandlesW  // 週足のローソク足が有効な場合のみ描画
+    if isTimeframeChangedW
+        realtimeCandleBodyW := box.new(left = candleBodyLeftBarIndexW, top = candleBodyTopW, right = candleBodyRightBarIndexW, bottom = candleBodyBottomW, bgcolor = candleBodyColorW, border_color = candleBorderColorW, border_width = BORDER_WIDTH)
+    else
+        box.set_border_color(realtimeCandleBodyW, candleBorderColorW)
+        box.set_bgcolor(realtimeCandleBodyW, candleBodyColorW)
+        box.set_top(realtimeCandleBodyW, candleBodyTopW)
+        box.set_bottom(realtimeCandleBodyW, candleBodyBottomW)
+
+    // ひげの描画
+    if isTimeframeChangedW
+        realtimeCandleUpperWickW := line.new(x1 = candleBodyMidpointBarIndexW, y1 = htfHighW,          x2 = candleBodyMidpointBarIndexW, y2 = candleBodyTopW, color = candleBorderColorW, width = WICK_WIDTH)
+        realtimeCandleLowerWickW := line.new(x1 = candleBodyMidpointBarIndexW, y1 = candleBodyBottomW, x2 = candleBodyMidpointBarIndexW, y2 = htfLowW,        color = candleBorderColorW, width = WICK_WIDTH)
+    else
+        line.set_color(realtimeCandleUpperWickW, candleBorderColorW)
+        line.set_y1(realtimeCandleUpperWickW, htfHighW)
+        line.set_y2(realtimeCandleUpperWickW, candleBodyTopW)
+        line.set_color(realtimeCandleLowerWickW, candleBorderColorW)
+        line.set_y1(realtimeCandleLowerWickW, candleBodyBottomW)
+        line.set_y2(realtimeCandleLowerWickW, htfLowW)
+
+//コードここまで週足
+//
+//
+//
+//
+//
+//
+//
+//ここから平均足コード
+//
+//
+// 平均足コードここから
+
+
+// Heikin Ashi Colors
+bullBodyColorHA = input.color(color.rgb(35, 150, 140), title="▲ HA Body", inline="▲", group="Heikin Ashi Colors")
+bearBodyColorHA = input.color(color.rgb(255, 45, 38), title="▼ HA Body", inline="▼", group="Heikin Ashi Colors")
+bullWickColorHA = input.color(color.rgb(35, 150, 140), title="▲ HA Wick", inline="▲", group="Heikin Ashi Colors")
+bearWickColorHA = input.color(color.rgb(255, 45, 38), title="▼ HA Wick", inline="▼", group="Heikin Ashi Colors")
+bullBorderColorHA = input.color(color.rgb(35, 150, 140), title="▲ HA Border", inline="▲", group="Heikin Ashi Colors")
+bearBorderColorHA = input.color(color.rgb(255, 45, 38), title="▼ HA Border", inline="▼", group="Heikin Ashi Colors")
+
+// Heikin Ashi の値を取得
+[haOpen, haHigh, haLow, haClose] = request.security(ticker.heikinashi(syminfo.tickerid), timeframe.period, [open, high, low, close])
+
+// 1分足であるかを判定
+bool is1MinuteChart = (timeframe.isminutes and timeframe.multiplier == 1)
+
+// Heikin Ashi キャンドルの色設定
+candleColorHA = haClose >= haOpen ? bullBodyColorHA : bearBodyColorHA
+wickColorHA = haClose >= haOpen ? bullWickColorHA : bearWickColorHA
+borderColorHA = haClose >= haOpen ? bullBorderColorHA : bearBorderColorHA
+
+// キャンドルを表示するかどうかのフラグ
+plotHeikinAshi = showHeikinAshi and (displayOnAllTimeframes or is1MinuteChart)
+
+// Heikin Ashi キャンドルの描画
+plotcandle(plotHeikinAshi ? haOpen : na,
+           plotHeikinAshi ? haHigh : na,
+           plotHeikinAshi ? haLow : na,
+           plotHeikinAshi ? haClose : na,
+           color=candleColorHA,
+           wickcolor=wickColorHA,
+           bordercolor=borderColorHA)
+
+// 平均足コードここまで
+
+
+
+
+// -------------- 5分足 平均足 --------------
+
+var string CANDLE_GROUP_HA_5M = '5M Heikin Ashi CANDLE SETTINGS'
+// 5分足 平均足のローソク足のオンオフ機能を追加
+var bool enableHeikinAshi5M = input.bool(false, title="5M Heikin Ashi Candle ON/OFF", group = HEIKIN_ASHI_CANDLE_GROUP)
+
+var string CANDLE_COLOR_GROUP_HA_5M = '5M Heikin Ashi COLOR'
+// 5分足 平均足の色の配置設定
+var color bullBodyColorHA5M = input.color(color.new(color.green, 85), title="▲ Body", inline="bullColorsHA5M", group=CANDLE_COLOR_GROUP_HA_5M)
+var color bullBorderColorHA5M = input.color(color.new(color.green, 100), title="▲ Border", inline="bullColorsHA5M", group=CANDLE_COLOR_GROUP_HA_5M)
+var color bearBodyColorHA5M = input.color(color.new(color.red, 85), title="▼ Body", inline="bearColorsHA5M", group=CANDLE_COLOR_GROUP_HA_5M)
+var color bearBorderColorHA5M = input.color(color.new(color.red, 100), title="▼ Border", inline="bearColorsHA5M", group=CANDLE_COLOR_GROUP_HA_5M)
+
+//グローバル変数 
+var box realtimeCandleBodyHA5M = na
+var line realtimeCandleUpperWickHA5M = na
+var line realtimeCandleLowerWickHA5M = na
+
+var int candleBodyLeftBarIndexHA5M = bar_index
+var int candleBodyRightBarIndexHA5M = na
+var int candleBodyMidpointBarIndexHA5M = na
+
+var color candleBodyColorHA5M = na
+var color candleBorderColorHA5M = na
+
+//インジケーター設定
+var string securitySymbolHA5M = ticker.heikinashi(syminfo.tickerid)
+var string securityTimeframeHA5M = "5"
+
+[htfOpenHA5M, htfHighHA5M, htfLowHA5M, htfCloseHA5M, htfTimeHA5M, htfTimeCloseHA5M] = request.security(symbol = securitySymbolHA5M, timeframe = securityTimeframeHA5M, expression = [open, high, low, close, time, time_close], lookahead = barmerge.lookahead_on)
+
+bool isTimeframeChangedHA5M = timeframe.change(securityTimeframeHA5M)
+
+if isTimeframeChangedHA5M
+    candleBodyLeftBarIndexHA5M := bar_index
+    candleBodyRightBarIndexHA5M := reduceFutureBarIndexToMaximum(candleBodyLeftBarIndexHA5M + int((htfTimeCloseHA5M - htfTimeHA5M) / (time_close - time)))
+    candleBodyMidpointBarIndexHA5M := calculateCandleBodyMidpointBarIndex(candleBodyRightBarIndexHA5M)
+//end if
+
+float candleBodyTopHA5M = math.max(htfOpenHA5M, htfCloseHA5M)
+float candleBodyBottomHA5M = math.min(htfOpenHA5M, htfCloseHA5M)
+
+bool isFallingHA5M = htfOpenHA5M > htfCloseHA5M
+bool isRisingHA5M = htfOpenHA5M < htfCloseHA5M
+
+// 枠とひげの色
+candleBorderColorHA5M := determineDirectionColor(isFallingHA5M, isRisingHA5M, bearBorderColorHA5M, bullBorderColorHA5M)
+candleBodyColorHA5M := determineDirectionColor(isFallingHA5M, isRisingHA5M, bearBodyColorHA5M, bullBodyColorHA5M)
+
+if enableHeikinAshi5M  // 5分足 平均足のローソク足が有効な場合のみ描画
+    if isTimeframeChangedHA5M
+        realtimeCandleBodyHA5M := box.new(left = candleBodyLeftBarIndexHA5M, top = candleBodyTopHA5M, right = candleBodyRightBarIndexHA5M, bottom = candleBodyBottomHA5M, bgcolor = candleBodyColorHA5M, border_color = candleBorderColorHA5M, border_width = BORDER_WIDTH)
+    else
+        box.set_border_color(realtimeCandleBodyHA5M, candleBorderColorHA5M)
+        box.set_bgcolor(realtimeCandleBodyHA5M, candleBodyColorHA5M)
+        box.set_top(realtimeCandleBodyHA5M, candleBodyTopHA5M)
+        box.set_bottom(realtimeCandleBodyHA5M, candleBodyBottomHA5M)
+
+    // ひげの描画
+    if isTimeframeChangedHA5M
+        realtimeCandleUpperWickHA5M := line.new(x1 = candleBodyMidpointBarIndexHA5M, y1 = htfHighHA5M,          x2 = candleBodyMidpointBarIndexHA5M, y2 = candleBodyTopHA5M, color = candleBorderColorHA5M, width = WICK_WIDTH)
+        realtimeCandleLowerWickHA5M := line.new(x1 = candleBodyMidpointBarIndexHA5M, y1 = candleBodyBottomHA5M, x2 = candleBodyMidpointBarIndexHA5M, y2 = htfLowHA5M,        color = candleBorderColorHA5M, width = WICK_WIDTH)
+    else
+        line.set_color(realtimeCandleUpperWickHA5M, candleBorderColorHA5M)
+        line.set_y1(realtimeCandleUpperWickHA5M, htfHighHA5M)
+        line.set_y2(realtimeCandleUpperWickHA5M, candleBodyTopHA5M)
+        line.set_color(realtimeCandleLowerWickHA5M, candleBorderColorHA5M)
+        line.set_y1(realtimeCandleLowerWickHA5M, candleBodyBottomHA5M)
+        line.set_y2(realtimeCandleLowerWickHA5M, htfLowHA5M)
+
+// コードここまで5分足 平均足
+
+// -------------- 15分足 平均足 --------------
+
+var string CANDLE_GROUP_HA_15M = '15M Heikin Ashi CANDLE SETTINGS'
+// 15分足 平均足のローソク足のオンオフ機能を追加
+var bool enableHeikinAshi15M = input.bool(false, title="15M Heikin Ashi Candle ON/OFF", group = HEIKIN_ASHI_CANDLE_GROUP)
+
+var string CANDLE_COLOR_GROUP_HA_15M = '15M Heikin Ashi COLOR'
+// 15分足 平均足の色の配置設定
+var color bullBodyColorHA15M = input.color(color.new(color.green, 85), title="▲ Body", inline="bullColorsHA15M", group=CANDLE_COLOR_GROUP_HA_15M)
+var color bullBorderColorHA15M = input.color(color.new(color.green, 100), title="▲ Border", inline="bullColorsHA15M", group=CANDLE_COLOR_GROUP_HA_15M)
+var color bearBodyColorHA15M = input.color(color.new(color.red, 85), title="▼ Body", inline="bearColorsHA15M", group=CANDLE_COLOR_GROUP_HA_15M)
+var color bearBorderColorHA15M = input.color(color.new(color.red, 100), title="▼ Border", inline="bearColorsHA15M", group=CANDLE_COLOR_GROUP_HA_15M)
+
+//グローバル変数 
+var box realtimeCandleBodyHA15M = na
+var line realtimeCandleUpperWickHA15M = na
+var line realtimeCandleLowerWickHA15M = na
+
+var int candleBodyLeftBarIndexHA15M = bar_index
+var int candleBodyRightBarIndexHA15M = na
+var int candleBodyMidpointBarIndexHA15M = na
+
+var color candleBodyColorHA15M = na
+var color candleBorderColorHA15M = na
+
+//インジケーター設定
+var string securitySymbolHA15M = ticker.heikinashi(syminfo.tickerid)
+var string securityTimeframeHA15M = "15"
+
+[htfOpenHA15M, htfHighHA15M, htfLowHA15M, htfCloseHA15M, htfTimeHA15M, htfTimeCloseHA15M] = request.security(symbol = securitySymbolHA15M, timeframe = securityTimeframeHA15M, expression = [open, high, low, close, time, time_close], lookahead = barmerge.lookahead_on)
+
+bool isTimeframeChangedHA15M = timeframe.change(securityTimeframeHA15M)
+
+if isTimeframeChangedHA15M
+    candleBodyLeftBarIndexHA15M := bar_index
+    candleBodyRightBarIndexHA15M := reduceFutureBarIndexToMaximum(candleBodyLeftBarIndexHA15M + int((htfTimeCloseHA15M - htfTimeHA15M) / (time_close - time)))
+    candleBodyMidpointBarIndexHA15M := calculateCandleBodyMidpointBarIndex(candleBodyRightBarIndexHA15M)
+//end if
+
+float candleBodyTopHA15M = math.max(htfOpenHA15M, htfCloseHA15M)
+float candleBodyBottomHA15M = math.min(htfOpenHA15M, htfCloseHA15M)
+
+bool isFallingHA15M = htfOpenHA15M > htfCloseHA15M
+bool isRisingHA15M = htfOpenHA15M < htfCloseHA15M
+
+// 枠とひげの色
+candleBorderColorHA15M := determineDirectionColor(isFallingHA15M, isRisingHA15M, bearBorderColorHA15M, bullBorderColorHA15M)
+candleBodyColorHA15M := determineDirectionColor(isFallingHA15M, isRisingHA15M, bearBodyColorHA15M, bullBodyColorHA15M)
+
+if enableHeikinAshi15M  // 15分足 平均足のローソク足が有効な場合のみ描画
+    if isTimeframeChangedHA15M
+        realtimeCandleBodyHA15M := box.new(left = candleBodyLeftBarIndexHA15M, top = candleBodyTopHA15M, right = candleBodyRightBarIndexHA15M, bottom = candleBodyBottomHA15M, bgcolor = candleBodyColorHA15M, border_color = candleBorderColorHA15M, border_width = BORDER_WIDTH)
+    else
+        box.set_border_color(realtimeCandleBodyHA15M, candleBorderColorHA15M)
+        box.set_bgcolor(realtimeCandleBodyHA15M, candleBodyColorHA15M)
+        box.set_top(realtimeCandleBodyHA15M, candleBodyTopHA15M)
+        box.set_bottom(realtimeCandleBodyHA15M, candleBodyBottomHA15M)
+
+    // ひげの描画
+    if isTimeframeChangedHA15M
+        realtimeCandleUpperWickHA15M := line.new(x1 = candleBodyMidpointBarIndexHA15M, y1 = htfHighHA15M,          x2 = candleBodyMidpointBarIndexHA15M, y2 = candleBodyTopHA15M, color = candleBorderColorHA15M, width = WICK_WIDTH)
+        realtimeCandleLowerWickHA15M := line.new(x1 = candleBodyMidpointBarIndexHA15M, y1 = candleBodyBottomHA15M, x2 = candleBodyMidpointBarIndexHA15M, y2 = htfLowHA15M,        color = candleBorderColorHA15M, width = WICK_WIDTH)
+    else
+        line.set_color(realtimeCandleUpperWickHA15M, candleBorderColorHA15M)
+        line.set_y1(realtimeCandleUpperWickHA15M, htfHighHA15M)
+        line.set_y2(realtimeCandleUpperWickHA15M, candleBodyTopHA15M)
+        line.set_color(realtimeCandleLowerWickHA15M, candleBorderColorHA15M)
+        line.set_y1(realtimeCandleLowerWickHA15M, candleBodyBottomHA15M)
+        line.set_y2(realtimeCandleLowerWickHA15M, htfLowHA15M)
+
+// コードここまで15分足 平均足
+
+
+
+
+//コードここから1時間足 平均足
+
+//入力設定
+var string CANDLE_GROUP_HA_1H = '1H Heikin Ashi CANDLE SETTINGS'
+// 1時間足 平均足のローソク足のオンオフ機能を追加
+var bool enableHeikinAshi1H = input.bool(false, title="1H Heikin Ashi Candle ON/OFF", group = HEIKIN_ASHI_CANDLE_GROUP)
+
+var string CANDLE_COLOR_GROUP_HA_1H = '1H Heikin Ashi COLOR————————————————'
+// 1時間足 平均足の色の配置設定
+var color bullBodyColorHA1H = input.color(color.new(color.green, 85), title="▲ Body", inline="bullColorsHA1H", group=CANDLE_COLOR_GROUP_HA_1H)
+var color bullBorderColorHA1H = input.color(color.new(color.green, 100), title="▲ Border", inline="bullColorsHA1H", group=CANDLE_COLOR_GROUP_HA_1H)
+var color bearBodyColorHA1H = input.color(color.new(color.red, 85), title="▼ Body", inline="bearColorsHA1H", group=CANDLE_COLOR_GROUP_HA_1H)
+var color bearBorderColorHA1H = input.color(color.new(color.red, 100), title="▼ Border", inline="bearColorsHA1H", group=CANDLE_COLOR_GROUP_HA_1H)
+
+//グローバル変数 
+var box realtimeCandleBodyHA1H = na
+var line realtimeCandleUpperWickHA1H = na
+var line realtimeCandleLowerWickHA1H = na
+
+var int candleBodyLeftBarIndexHA1H = bar_index
+var int candleBodyRightBarIndexHA1H = na
+var int candleBodyMidpointBarIndexHA1H = na
+
+var color candleBodyColorHA1H = na
+var color candleBorderColorHA1H = na
+
+//インジケーター設定
+var string securitySymbolHA1H = ticker.heikinashi(syminfo.tickerid)
+var string securityTimeframeHA1H = "60"
+
+[htfOpenHA1H, htfHighHA1H, htfLowHA1H, htfCloseHA1H, htfTimeHA1H, htfTimeCloseHA1H] = request.security(symbol = securitySymbolHA1H, timeframe = securityTimeframeHA1H, expression = [open, high, low, close, time, time_close], lookahead = barmerge.lookahead_on)
+
+bool isTimeframeChangedHA1H = timeframe.change(securityTimeframeHA1H)
+
+if isTimeframeChangedHA1H
+    candleBodyLeftBarIndexHA1H := bar_index
+    candleBodyRightBarIndexHA1H := reduceFutureBarIndexToMaximum(candleBodyLeftBarIndexHA1H + int((htfTimeCloseHA1H - htfTimeHA1H) / (time_close - time)))
+    candleBodyMidpointBarIndexHA1H := calculateCandleBodyMidpointBarIndex(candleBodyRightBarIndexHA1H)
+//end if
+
+float candleBodyTopHA1H = math.max(htfOpenHA1H, htfCloseHA1H)
+float candleBodyBottomHA1H = math.min(htfOpenHA1H, htfCloseHA1H)
+
+bool isFallingHA1H = htfOpenHA1H > htfCloseHA1H
+bool isRisingHA1H = htfOpenHA1H < htfCloseHA1H
+
+// 枠とひげの色
+candleBorderColorHA1H := determineDirectionColor(isFallingHA1H, isRisingHA1H, bearBorderColorHA1H, bullBorderColorHA1H)
+candleBodyColorHA1H := determineDirectionColor(isFallingHA1H, isRisingHA1H, bearBodyColorHA1H, bullBodyColorHA1H)
+
+if enableHeikinAshi1H  // 1時間足 平均足のローソク足が有効な場合のみ描画
+    if isTimeframeChangedHA1H
+        realtimeCandleBodyHA1H := box.new(left = candleBodyLeftBarIndexHA1H, top = candleBodyTopHA1H, right = candleBodyRightBarIndexHA1H, bottom = candleBodyBottomHA1H, bgcolor = candleBodyColorHA1H, border_color = candleBorderColorHA1H, border_width = BORDER_WIDTH)
+    else
+        box.set_border_color(realtimeCandleBodyHA1H, candleBorderColorHA1H)
+        box.set_bgcolor(realtimeCandleBodyHA1H, candleBodyColorHA1H)
+        box.set_top(realtimeCandleBodyHA1H, candleBodyTopHA1H)
+        box.set_bottom(realtimeCandleBodyHA1H, candleBodyBottomHA1H)
+
+    // ひげの描画
+    if isTimeframeChangedHA1H
+        realtimeCandleUpperWickHA1H := line.new(x1 = candleBodyMidpointBarIndexHA1H, y1 = htfHighHA1H,          x2 = candleBodyMidpointBarIndexHA1H, y2 = candleBodyTopHA1H, color = candleBorderColorHA1H, width = WICK_WIDTH)
+        realtimeCandleLowerWickHA1H := line.new(x1 = candleBodyMidpointBarIndexHA1H, y1 = candleBodyBottomHA1H, x2 = candleBodyMidpointBarIndexHA1H, y2 = htfLowHA1H,        color = candleBorderColorHA1H, width = WICK_WIDTH)
+    else
+        line.set_color(realtimeCandleUpperWickHA1H, candleBorderColorHA1H)
+        line.set_y1(realtimeCandleUpperWickHA1H, htfHighHA1H)
+        line.set_y2(realtimeCandleUpperWickHA1H, candleBodyTopHA1H)
+        line.set_color(realtimeCandleLowerWickHA1H, candleBorderColorHA1H)
+        line.set_y1(realtimeCandleLowerWickHA1H, candleBodyBottomHA1H)
+        line.set_y2(realtimeCandleLowerWickHA1H, htfLowHA1H)
+
+//コードここまで1時間足 平均足
+//コードここから4時間足 平均足
+
+//入力設定
+var string CANDLE_GROUP_HA_4H = '4H Heikin Ashi CANDLE SETTINGS'
+// 4時間足 平均足のローソク足のオンオフ機能を追加
+var bool enableHeikinAshi4H = input.bool(false, title="4H Heikin Ashi Candle ON/OFF", group = HEIKIN_ASHI_CANDLE_GROUP)
+
+var string CANDLE_COLOR_GROUP_HA_4H = '4H Heikin Ashi COLOR'
+// 4時間足 平均足の色の配置設定
+var color bullBodyColorHA4H = input.color(color.new(color.green, 85), title="▲ Body", inline="bullColorsHA4H", group=CANDLE_COLOR_GROUP_HA_4H)
+var color bullBorderColorHA4H = input.color(color.new(color.green, 100), title="▲ Border", inline="bullColorsHA4H", group=CANDLE_COLOR_GROUP_HA_4H)
+var color bearBodyColorHA4H = input.color(color.new(color.red, 85), title="▼ Body", inline="bearColorsHA4H", group=CANDLE_COLOR_GROUP_HA_4H)
+var color bearBorderColorHA4H = input.color(color.new(color.red, 100), title="▼ Border", inline="bearColorsHA4H", group=CANDLE_COLOR_GROUP_HA_4H)
+
+//グローバル変数 
+var box realtimeCandleBodyHA4H = na
+var line realtimeCandleUpperWickHA4H = na
+var line realtimeCandleLowerWickHA4H = na
+
+var int candleBodyLeftBarIndexHA4H = bar_index
+var int candleBodyRightBarIndexHA4H = na
+var int candleBodyMidpointBarIndexHA4H = na
+
+var color candleBodyColorHA4H = na
+var color candleBorderColorHA4H = na
+
+//インジケーター設定
+var string securitySymbolHA4H = ticker.heikinashi(syminfo.tickerid)
+var string securityTimeframeHA4H = "240"
+
+[htfOpenHA4H, htfHighHA4H, htfLowHA4H, htfCloseHA4H, htfTimeHA4H, htfTimeCloseHA4H] = request.security(symbol = securitySymbolHA4H, timeframe = securityTimeframeHA4H, expression = [open, high, low, close, time, time_close], lookahead = barmerge.lookahead_on)
+
+bool isTimeframeChangedHA4H = timeframe.change(securityTimeframeHA4H)
+
+if isTimeframeChangedHA4H
+    candleBodyLeftBarIndexHA4H := bar_index
+    candleBodyRightBarIndexHA4H := reduceFutureBarIndexToMaximum(candleBodyLeftBarIndexHA4H + int((htfTimeCloseHA4H - htfTimeHA4H) / (time_close - time)))
+    candleBodyMidpointBarIndexHA4H := calculateCandleBodyMidpointBarIndex(candleBodyRightBarIndexHA4H)
+//end if
+
+float candleBodyTopHA4H = math.max(htfOpenHA4H, htfCloseHA4H)
+float candleBodyBottomHA4H = math.min(htfOpenHA4H, htfCloseHA4H)
+
+bool isFallingHA4H = htfOpenHA4H > htfCloseHA4H
+bool isRisingHA4H = htfOpenHA4H < htfCloseHA4H
+
+// 枠とひげの色
+candleBorderColorHA4H := determineDirectionColor(isFallingHA4H, isRisingHA4H, bearBorderColorHA4H, bullBorderColorHA4H)
+candleBodyColorHA4H := determineDirectionColor(isFallingHA4H, isRisingHA4H, bearBodyColorHA4H, bullBodyColorHA4H)
+
+if enableHeikinAshi4H  // 4時間足 平均足のローソク足が有効な場合のみ描画
+    if isTimeframeChangedHA4H
+        realtimeCandleBodyHA4H := box.new(left = candleBodyLeftBarIndexHA4H, top = candleBodyTopHA4H, right = candleBodyRightBarIndexHA4H, bottom = candleBodyBottomHA4H, bgcolor = candleBodyColorHA4H, border_color = candleBorderColorHA4H, border_width = BORDER_WIDTH)
+    else
+        box.set_border_color(realtimeCandleBodyHA4H, candleBorderColorHA4H)
+        box.set_bgcolor(realtimeCandleBodyHA4H, candleBodyColorHA4H)
+        box.set_top(realtimeCandleBodyHA4H, candleBodyTopHA4H)
+        box.set_bottom(realtimeCandleBodyHA4H, candleBodyBottomHA4H)
+
+    // ひげの描画
+    if isTimeframeChangedHA4H
+        realtimeCandleUpperWickHA4H := line.new(x1 = candleBodyMidpointBarIndexHA4H, y1 = htfHighHA4H,          x2 = candleBodyMidpointBarIndexHA4H, y2 = candleBodyTopHA4H, color = candleBorderColorHA4H, width = WICK_WIDTH)
+        realtimeCandleLowerWickHA4H := line.new(x1 = candleBodyMidpointBarIndexHA4H, y1 = candleBodyBottomHA4H, x2 = candleBodyMidpointBarIndexHA4H, y2 = htfLowHA4H,        color = candleBorderColorHA4H, width = WICK_WIDTH)
+    else
+        line.set_color(realtimeCandleUpperWickHA4H, candleBorderColorHA4H)
+        line.set_y1(realtimeCandleUpperWickHA4H, htfHighHA4H)
+        line.set_y2(realtimeCandleUpperWickHA4H, candleBodyTopHA4H)
+        line.set_color(realtimeCandleLowerWickHA4H, candleBorderColorHA4H)
+        line.set_y1(realtimeCandleLowerWickHA4H, candleBodyBottomHA4H)
+        line.set_y2(realtimeCandleLowerWickHA4H, htfLowHA4H)
+
+//コードここまで4時間足 平均足
+//コードここから日足 平均足
+
+//入力設定
+var string CANDLE_GROUP_HA_D = 'Daily Heikin Ashi CANDLE SETTINGS'
+// 日足 平均足のローソク足のオンオフ機能を追加
+var bool enableHeikinAshiD = input.bool(false, title="Daily Heikin Ashi Candle ON/OFF", group = HEIKIN_ASHI_CANDLE_GROUP)
+
+var string CANDLE_COLOR_GROUP_HA_D = 'Daily Heikin Ashi COLOR'
+// 日足 平均足の色の配置設定
+var color bullBodyColorHAD = input.color(color.new(color.green, 85), title="▲ Body", inline="bullColorsHAD", group=CANDLE_COLOR_GROUP_HA_D)
+var color bullBorderColorHAD = input.color(color.new(color.green, 100), title="▲ Border", inline="bullColorsHAD", group=CANDLE_COLOR_GROUP_HA_D)
+var color bearBodyColorHAD = input.color(color.new(color.red, 85), title="▼ Body", inline="bearColorsHAD", group=CANDLE_COLOR_GROUP_HA_D)
+var color bearBorderColorHAD = input.color(color.new(color.red, 100), title="▼ Border", inline="bearColorsHAD", group=CANDLE_COLOR_GROUP_HA_D)
+
+//グローバル変数 
+var box realtimeCandleBodyHAD = na
+var line realtimeCandleUpperWickHAD = na
+var line realtimeCandleLowerWickHAD = na
+
+var int candleBodyLeftBarIndexHAD = bar_index
+var int candleBodyRightBarIndexHAD = na
+var int candleBodyMidpointBarIndexHAD = na
+
+var color candleBodyColorHAD = na
+var color candleBorderColorHAD = na
+
+//インジケーター設定
+var string securitySymbolHAD = ticker.heikinashi(syminfo.tickerid)
+var string securityTimeframeHAD = "D"
+
+[htfOpenHAD, htfHighHAD, htfLowHAD, htfCloseHAD, htfTimeHAD, htfTimeCloseHAD] = request.security(symbol = securitySymbolHAD, timeframe = securityTimeframeHAD, expression = [open, high, low, close, time, time_close], lookahead = barmerge.lookahead_on)
+
+bool isTimeframeChangedHAD = timeframe.change(securityTimeframeHAD)
+
+if isTimeframeChangedHAD
+    candleBodyLeftBarIndexHAD := bar_index
+    candleBodyRightBarIndexHAD := reduceFutureBarIndexToMaximum(candleBodyLeftBarIndexHAD + int((htfTimeCloseHAD - htfTimeHAD) / (time_close - time)))
+    candleBodyMidpointBarIndexHAD := calculateCandleBodyMidpointBarIndex(candleBodyRightBarIndexHAD)
+//end if
+
+float candleBodyTopHAD = math.max(htfOpenHAD, htfCloseHAD)
+float candleBodyBottomHAD = math.min(htfOpenHAD, htfCloseHAD)
+
+bool isFallingHAD = htfOpenHAD > htfCloseHAD
+bool isRisingHAD = htfOpenHAD < htfCloseHAD
+
+// 枠とひげの色
+candleBorderColorHAD := determineDirectionColor(isFallingHAD, isRisingHAD, bearBorderColorHAD, bullBorderColorHAD)
+candleBodyColorHAD := determineDirectionColor(isFallingHAD, isRisingHAD, bearBodyColorHAD, bullBodyColorHAD)
+
+if enableHeikinAshiD  // 日足 平均足のローソク足が有効な場合のみ描画
+    if isTimeframeChangedHAD
+        realtimeCandleBodyHAD := box.new(left = candleBodyLeftBarIndexHAD, top = candleBodyTopHAD, right = candleBodyRightBarIndexHAD, bottom = candleBodyBottomHAD, bgcolor = candleBodyColorHAD, border_color = candleBorderColorHAD, border_width = BORDER_WIDTH)
+    else
+        box.set_border_color(realtimeCandleBodyHAD, candleBorderColorHAD)
+        box.set_bgcolor(realtimeCandleBodyHAD, candleBodyColorHAD)
+        box.set_top(realtimeCandleBodyHAD, candleBodyTopHAD)
+        box.set_bottom(realtimeCandleBodyHAD, candleBodyBottomHAD)
+
+    // ひげの描画
+    if isTimeframeChangedHAD
+        realtimeCandleUpperWickHAD := line.new(x1 = candleBodyMidpointBarIndexHAD, y1 = htfHighHAD,          x2 = candleBodyMidpointBarIndexHAD, y2 = candleBodyTopHAD, color = candleBorderColorHAD, width = WICK_WIDTH)
+        realtimeCandleLowerWickHAD := line.new(x1 = candleBodyMidpointBarIndexHAD, y1 = candleBodyBottomHAD, x2 = candleBodyMidpointBarIndexHAD, y2 = htfLowHAD,        color = candleBorderColorHAD, width = WICK_WIDTH)
+    else
+        line.set_color(realtimeCandleUpperWickHAD, candleBorderColorHAD)
+        line.set_y1(realtimeCandleUpperWickHAD, htfHighHAD)
+        line.set_y2(realtimeCandleUpperWickHAD, candleBodyTopHAD)
+        line.set_color(realtimeCandleLowerWickHAD, candleBorderColorHAD)
+        line.set_y1(realtimeCandleLowerWickHAD, candleBodyBottomHAD)
+        line.set_y2(realtimeCandleLowerWickHAD, htfLowHAD)
+
+//コードここまで日足 平均足
+//コードここから週足 平均足
+
+//入力設定
+var string CANDLE_GROUP_HA_W = 'Weekly Heikin Ashi CANDLE SETTINGS'
+// 週足 平均足のローソク足のオンオフ機能を追加
+var bool enableHeikinAshiW = input.bool(false, title="Weekly Heikin Ashi Candle ON/OFF", group = HEIKIN_ASHI_CANDLE_GROUP)
+
+var string CANDLE_COLOR_GROUP_HA_W = 'Weekly Heikin Ashi COLOR'
+// 週足 平均足の色の配置設定
+var color bullBodyColorHAW = input.color(color.new(color.green, 85), title="▲ Body", inline="bullColorsHAW", group=CANDLE_COLOR_GROUP_HA_W)
+var color bullBorderColorHAW = input.color(color.new(color.green, 100), title="▲ Border", inline="bullColorsHAW", group=CANDLE_COLOR_GROUP_HA_W)
+var color bearBodyColorHAW = input.color(color.new(color.red, 85), title="▼ Body", inline="bearColorsHAW", group=CANDLE_COLOR_GROUP_HA_W)
+var color bearBorderColorHAW = input.color(color.new(color.red, 100), title="▼ Border", inline="bearColorsHAW", group=CANDLE_COLOR_GROUP_HA_W)
+
+//グローバル変数 
+var box realtimeCandleBodyHAW = na
+var line realtimeCandleUpperWickHAW = na
+var line realtimeCandleLowerWickHAW = na
+
+var int candleBodyLeftBarIndexHAW = bar_index
+var int candleBodyRightBarIndexHAW = na
+var int candleBodyMidpointBarIndexHAW = na
+
+var color candleBodyColorHAW = na
+var color candleBorderColorHAW = na
+
+//インジケーター設定
+var string securitySymbolHAW = ticker.heikinashi(syminfo.tickerid)
+var string securityTimeframeHAW = "W"
+
+[htfOpenHAW, htfHighHAW, htfLowHAW, htfCloseHAW, htfTimeHAW, htfTimeCloseHAW] = request.security(symbol = securitySymbolHAW, timeframe = securityTimeframeHAW, expression = [open, high, low, close, time, time_close], lookahead = barmerge.lookahead_on)
+
+bool isTimeframeChangedHAW = timeframe.change(securityTimeframeHAW)
+
+if isTimeframeChangedHAW
+    candleBodyLeftBarIndexHAW := bar_index
+    candleBodyRightBarIndexHAW := reduceFutureBarIndexToMaximum(candleBodyLeftBarIndexHAW + int((htfTimeCloseHAW - htfTimeHAW) / (time_close - time)))
+    candleBodyMidpointBarIndexHAW := calculateCandleBodyMidpointBarIndex(candleBodyRightBarIndexHAW)
+//end if
+
+float candleBodyTopHAW = math.max(htfOpenHAW, htfCloseHAW)
+float candleBodyBottomHAW = math.min(htfOpenHAW, htfCloseHAW)
+
+bool isFallingHAW = htfOpenHAW > htfCloseHAW
+bool isRisingHAW = htfOpenHAW < htfCloseHAW
+
+// 枠とひげの色
+candleBorderColorHAW := determineDirectionColor(isFallingHAW, isRisingHAW, bearBorderColorHAW, bullBorderColorHAW)
+candleBodyColorHAW := determineDirectionColor(isFallingHAW, isRisingHAW, bearBodyColorHAW, bullBodyColorHAW)
+
+if enableHeikinAshiW  // 週足 平均足のローソク足が有効な場合のみ描画
+    if isTimeframeChangedHAW
+        realtimeCandleBodyHAW := box.new(left = candleBodyLeftBarIndexHAW, top = candleBodyTopHAW, right = candleBodyRightBarIndexHAW, bottom = candleBodyBottomHAW, bgcolor = candleBodyColorHAW, border_color = candleBorderColorHAW, border_width = BORDER_WIDTH)
+    else
+        box.set_border_color(realtimeCandleBodyHAW, candleBorderColorHAW)
+        box.set_bgcolor(realtimeCandleBodyHAW, candleBodyColorHAW)
+        box.set_top(realtimeCandleBodyHAW, candleBodyTopHAW)
+        box.set_bottom(realtimeCandleBodyHAW, candleBodyBottomHAW)
+
+    // ひげの描画
+    if isTimeframeChangedHAW
+        realtimeCandleUpperWickHAW := line.new(x1 = candleBodyMidpointBarIndexHAW, y1 = htfHighHAW,          x2 = candleBodyMidpointBarIndexHAW, y2 = candleBodyTopHAW, color = candleBorderColorHAW, width = WICK_WIDTH)
+        realtimeCandleLowerWickHAW := line.new(x1 = candleBodyMidpointBarIndexHAW, y1 = candleBodyBottomHAW, x2 = candleBodyMidpointBarIndexHAW, y2 = htfLowHAW,        color = candleBorderColorHAW, width = WICK_WIDTH)
+    else
+        line.set_color(realtimeCandleUpperWickHAW, candleBorderColorHAW)
+        line.set_y1(realtimeCandleUpperWickHAW, htfHighHAW)
+        line.set_y2(realtimeCandleUpperWickHAW, candleBodyTopHAW)
+        line.set_color(realtimeCandleLowerWickHAW, candleBorderColorHAW)
+        line.set_y1(realtimeCandleLowerWickHAW, candleBodyBottomHAW)
+        line.set_y2(realtimeCandleLowerWickHAW, htfLowHAW)
+
+//コードここまで週足 平均足
+
+
+
+// ＃＃＃＃＃＃＃＃＃＃　ZigZag　＃＃＃＃＃＃＃＃＃ここからzigzagコード
+// ZigZagの設定
+
+
+const int UP = 1
+const int DOWN = -1
+
+// @type 各バーのデータをラップするオブジェクト
+type Bar
+    int time = time
+    int x = bar_index
+    float high = high
+    float low = low
+
+// @function バーの高値ポイントを取得する
+// @returns バーの高値ポイント
+method highPoint(Bar this) =>
+    chart.point.new(this.time, this.x, this.high)
+
+// @function バーの安値ポイントを取得する
+// @returns バーの安値ポイント
+method lowPoint(Bar this) =>
+    chart.point.new(this.time, this.x, this.low)
+
+// @type ZigZagアルゴリズムの設定
+type Settings
+    int swingLen
+    color lineColor
+    string lineStyle
+    int lineWidth
+
+// @type チャート上のスイング
+type Swing
+    Settings settings
+    Swing prev
+    chart.point start
+    chart.point end
+    line[] hLines
+
+// @function スイングを初期化する
+method init(Swing this, Settings settings, Swing prev, chart.point start, chart.point end) =>
+    this.settings := settings
+    this.prev := prev
+    this.start := start
+    this.end := end
+    this.hLines := array.new_line(0)
+    this
+
+// @function スイングの方向を取得する
+// @returns スイングの方向
+method direction(Swing this) =>
+    this.end.price >= this.start.price ? UP : DOWN
+
+// @function スイングの長さを取得する
+// @returns スイングの長さ
+method len(Swing this) =>
+    this.end.index - this.start.index + 1
+
+// @function スイングの振幅を取得する
+// @returns スイングの振幅
+method amplitude(Swing this) =>
+    math.abs(this.end.price - this.start.price)
+
+// @function スイングが有効かどうかをチェックする。スイングが十分なバーを持つか、前のスイングよりも振幅が大きい場合、有効とされる。
+// @returns スイングが有効かどうか
+method isValid(Swing this) =>
+    if this.len() >= this.settings.swingLen
+        true
+    else if not na(this.prev)
+        this.amplitude() > this.prev.amplitude()
+    else
+        false
+
+// @function スイングが指定されたバーによって拡張されるかどうかをチェックする
+// @param bar チェック対象のバー
+// @returns スイングが拡張されるかどうか
+method isExtendedBy(Swing this, Bar bar) =>
+    this.direction() == UP ? bar.high > this.end.price : bar.low < this.end.price
+
+// @function スイングを指定されたバーに拡張する
+// @param 拡張するバー
+method extend(Swing this, Bar bar) =>
+    chart.point end = this.direction() == UP ? bar.highPoint() : bar.lowPoint()
+    this.end := end
+
+// @function スイングの水平線を描画する
+method drawHLines(Swing this, color hLineColor, string hLineStyle, int hLineWidth, int hLineLength) =>
+    // 既存の水平線を削除
+    for l in this.hLines
+        l.delete()
+    array.clear(this.hLines)
+    // 新しい水平線を作成
+    line hLine1 = line.new(x1=this.start.time, y1=this.start.price, x2=this.start.time + hLineLength * 60 * 1000, y2=this.start.price, color=hLineColor, width=hLineWidth, style=hLineStyle, xloc=xloc.bar_time)
+    line hLine2 = line.new(x1=this.end.time, y1=this.end.price, x2=this.end.time + hLineLength * 60 * 1000, y2=this.end.price, color=hLineColor, width=hLineWidth, style=hLineStyle, xloc=xloc.bar_time)
+    array.push(this.hLines, hLine1)
+    array.push(this.hLines, hLine2)
+
+// @type ZigZagアルゴリズム
+type ZigZag
+    Settings _settings
+    chart.point _firstPoint
+    Swing[] _swings
+    polyline _swingsPoly
+
+// @function ZigZagオブジェクトを初期化する
+// @param settings 設定オブジェクト
+// @returns 初期化されたインスタンス
+method init(ZigZag this, Settings settings) =>
+    this._settings := settings
+    this._swings := array.new<Swing>()
+    this
+
+// @function 新しいバーを分析してZigZagを更新する
+// @param bar 新しいバー。naが提供された場合、自動的にバーを構築して使用する。
+method tick(ZigZag this, Bar bar = na) =>
+    Bar b = na(bar) ? Bar.new() : bar
+    int size = this._swings.size()
+    if size == 0
+        if na(this._firstPoint)
+            this._firstPoint := b.lowPoint()
+        else
+            if b.low < this._firstPoint.price
+                this._firstPoint := b.lowPoint()
+            else
+                Swing swing = Swing.new().init(
+                  this._settings,
+                  prev = na,
+                  start = this._firstPoint,
+                  end = b.highPoint())
+                this._swings.push(swing)
+    else
+        Swing s = this._swings.last()
+        Swing prevS = size > 1 ? this._swings.get(size - 2) : na
+        bool extendedPrev = if not na(prevS)
+            if prevS.isExtendedBy(b) and not s.isValid()
+                this._swings.pop()
+                prevS.extend(b)
+                true
+        if not extendedPrev
+            if s.isExtendedBy(b)
+                s.extend(b)
+            else if s.isValid()
+                Swing newSwing = Swing.new().init(
+                  this._settings,
+                  prev = s,
+                  start = s.end,
+                  end = s.direction() == UP ? b.lowPoint() : b.highPoint())
+                this._swings.push(newSwing)
+    0
+
+// @function チャートにZigZagラインと水平線を描画する
+method draw(ZigZag this, bool showHLines, color hLineColor, string hLineStyle, int hLineWidth, int hLineCount, int hLineLength) =>
+    chart.point[] points = array.new<chart.point>()
+    int drawnLines = 0
+    int swingCount = this._swings.size()
+    for [i, s] in this._swings
+        if i == 0
+            points.push(s.start)
+        points.push(s.end)
+        // 最新のスイングではなく、1つ前の確定したスイングから水平線を描画
+        if showHLines and drawnLines < hLineCount - 1 and i >= swingCount - hLineCount
+            s.drawHLines(hLineColor, hLineStyle, hLineWidth, hLineLength)
+            drawnLines := drawnLines + 1
+    if not na(this._swingsPoly)
+        this._swingsPoly.delete()
+    this._swingsPoly := polyline.new(
+      points,
+      xloc = xloc.bar_time,
+      line_color = this._settings.lineColor,
+      line_style = this._settings.lineStyle,
+      line_width = this._settings.lineWidth)
+
+// --- ユーザー入力に基づく１本目のZigZag設定 ---
+
+swingLengthInput2 = input.int(5, "Swing Length", minval = 1,inline="ZigZag 1", group="＿＿ZigZag 1 ＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿")
+lineColorInput2 = input.color(#cf2626, " Color",inline="ZigZag 1")
+lineStyleInput2 = input.string("Solid", "Style", options = ["Solid", "Dashed", "Dotted"],inline="ZigZag 2")
+lineWidthInput2 = input.int(1, " Width", minval = 1,inline="ZigZag 2")
+
+hLineShow2 = input.bool(false, "水平線 ON/OFF horizontal line", inline="ZigZag 1-2", group="＿＿ZigZag 1 horizon ＿＿")
+hLineColor2 = input.color(#cf2626, " Color", inline="ZigZag 1-2")
+hLineStyle2 = input.string("Solid", "Style", options = ["Solid", "Dashed", "Dotted"], inline="ZigZag 1-2")
+hLineWidth2 = input.int(1, "水平線 Width", minval = 1, inline="ZigZag 2-1")
+hLineCount2 = input.int(2, "Line Count 本数", minval = 2, maxval = 20, inline="ZigZag 2-1")
+hLineLength2 = input.int(20000, "line length 長さ", minval = 1, maxval = 100000, inline="ZigZag 2-1")
+
+lineStyleMap2 = lineStyleInput2 == "Solid" ? line.style_solid : lineStyleInput2 == "Dashed" ? line.style_dashed : line.style_dotted
+hLineStyleMap2 = hLineStyle2 == "Solid" ? line.style_solid : hLineStyle2 == "Dashed" ? line.style_dashed : line.style_dotted
+
+var ZigZag zz2 = ZigZag.new().init(
+  Settings.new(
+      swingLen = swingLengthInput2,
+      lineColor = lineColorInput2,
+      lineStyle = lineStyleMap2,
+      lineWidth = lineWidthInput2))
+zz2.tick()
+
+if barstate.islast and showLine2
+    zz2.draw(hLineShow2, hLineColor2, hLineStyleMap2, hLineWidth2, hLineCount2, hLineLength2)
+
+// --- ZigZag 2 の設定 (Multi-Timeframe Version) ---
+// --- ZigZag 2 の設定 (Multi-Timeframe Version) ---
+
+// 時間軸の選択
+zigzagTimeframe = input.timeframe("60", "ZigZag 2 Timeframe", group="＿＿ZigZag 2 ＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿")
+
+// 各時間軸ごとのSwing Length設定
+swingLength1Min_ZZ2 = input.int(125, "・1M） Swing Length", group="＿＿ZigZag 2 Swing Length＿＿")
+swingLength5Min_ZZ2 = input.int(25, "・5M） Swing Length", group="＿＿ZigZag 2 Swing Length＿＿")
+swingLength15Min_ZZ2 = input.int(15, "・15M） Swing Length", group="＿＿ZigZag 2 Swing Length＿＿")
+swingLength30Min_ZZ2 = input.int(20, "・30M） Swing Length", group="＿＿ZigZag 2 Swing Length＿＿")
+swingLength1Hour_ZZ2 = input.int(25, "・1H） Swing Length", group="＿＿ZigZag 2 Swing Length＿＿")
+swingLength4Hour_ZZ2 = input.int(50, "・4H） Swing Length", group="＿＿ZigZag 2 Swing Length＿＿")
+swingLengthDaily_ZZ2 = input.int(100, "・D） Swing Length", group="＿＿ZigZag 2 Swing Length＿＿")
+swingLengthWeekly_ZZ2 = input.int(20, "・W） Swing Length", group="＿＿ZigZag 2 Swing Length＿＿")
+
+lineStyleInput1 = input.string("Solid", "Style", options = ["Solid", "Dashed", "Dotted"],inline="ZigZag 3", group="＿＿ZigZag 2 ＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿")
+lineColorInput1 = input.color(#000000, "Color",inline="ZigZag 3")
+lineWidthInput1 = input.int(2, " Width", minval = 1,inline="ZigZag 3")
+
+hLineShow1 = input.bool(false, "水平線 ON/OFF horizontal line", inline="ZigZag 4", group="＿＿ZigZag 2 horizon ＿＿")
+hLineColor1 = input.color(#000000, "Color", inline="ZigZag 4")
+hLineStyle1 = input.string("Solid", "Style", options = ["Solid", "Dashed", "Dotted"], inline="ZigZag 4")
+hLineWidth1 = input.int(1, "Width", minval = 1, inline="ZigZag 5")
+hLineCount1 = input.int(2, "Line Count 本数", minval = 2, maxval = 20, inline="ZigZag 5")
+hLineLength1 = input.int(20000, "line length 長さ", minval = 1, maxval = 100000, inline="ZigZag 5")
+
+lineStyleMap1 = lineStyleInput1 == "Solid" ? line.style_solid : lineStyleInput1 == "Dashed" ? line.style_dashed : line.style_dotted
+hLineStyleMap1 = hLineStyle1 == "Solid" ? line.style_solid : hLineStyle1 == "Dashed" ? line.style_dashed : line.style_dotted
+
+// ZigZag 2の時間軸に基づいてSwing Lengthを決定
+getSwingLengthForTimeframe(string tf) =>
+    if tf == "1"
+        swingLength1Min_ZZ2
+    else if tf == "5"
+        swingLength5Min_ZZ2
+    else if tf == "15"
+        swingLength15Min_ZZ2
+    else if tf == "30"
+        swingLength30Min_ZZ2
+    else if tf == "60"
+        swingLength1Hour_ZZ2
+    else if tf == "240"
+        swingLength4Hour_ZZ2
+    else if tf == "D"
+        swingLengthDaily_ZZ2
+    else if tf == "W"
+        swingLengthWeekly_ZZ2
+    else
+        25  // デフォルト値
+
+swingLengthForZZ2 = getSwingLengthForTimeframe(zigzagTimeframe)
+
+// Higher Timeframe データの取得
+[htfHigh1, htfLow1, htfTime1, htfBarIndex1] = request.security(syminfo.tickerid, zigzagTimeframe, [high, low, time, bar_index], lookahead = barmerge.lookahead_off)
+
+// ZigZag 2の初期化
+var ZigZag zz1 = ZigZag.new().init(
+  Settings.new(
+      swingLen = swingLengthForZZ2,
+      lineColor = lineColorInput1,
+      lineStyle = lineStyleMap1,
+      lineWidth = lineWidthInput1))
+
+// 毎バーHTFデータでZigZagを更新
+Bar htfBar = Bar.new(htfTime1, bar_index, htfHigh1, htfLow1)
+zz1.tick(htfBar)
+
+if barstate.islast and showLine1
+    zz1.draw(hLineShow1, hLineColor1, hLineStyleMap1, hLineWidth1, hLineCount1, hLineLength1)

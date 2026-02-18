@@ -1,0 +1,29 @@
+//@version=5
+indicator("EMA - TEMA Histogram (50 & 100)", overlay=false)
+
+// Inputs
+len = input.int(240, "Length 1 (for main TEMA)")
+src = input(close)
+
+// --- EMA ---
+ema_val = ta.ema(src, len)
+
+// --- TEMA (len) ---
+ema1  = ta.ema(src, len)
+ema2  = ta.ema(ema1, len)
+ema3  = ta.ema(ema2, len)
+tema_val = 3 * (ema1 - ema2) + ema3
+
+// --- TEMA (100) ---
+ema1_100 = ta.ema(src, 60)
+ema2_100 = ta.ema(ema1_100, 60)
+ema3_100 = ta.ema(ema2_100, 60)
+tema100_val = 3 * (ema1_100 - ema2_100) + ema3_100
+
+// --- Histograms ---
+hist  = - ema_val + tema_val
+hist2 = - ema_val + tema100_val
+
+plot(hist,  "EMA - TEMA",  style=plot.style_histogram)
+plot(hist2, "EMA - TEMA100", color=color.yellow, linewidth=2)
+plot(0, color=color.gray)

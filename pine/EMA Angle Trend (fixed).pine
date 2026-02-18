@@ -1,0 +1,21 @@
+//@version=6
+indicator("EMA Angle (Time-based)", overlay=false)
+
+ema_length = input.int(50, "EMA Length")
+lookback_bars = input.int(5, "Lookback Bars")
+angle_scale = input.float(1.0, "Angle Scaling Factor", minval=0.0001)
+
+// === EMA Calculation ===
+ema_val = ta.ema(close, ema_length)
+ema_past = ema_val[lookback_bars]
+
+// === ΔY and ΔX ===
+delta_y = ema_val - ema_past                     // price change
+delta_x = lookback_bars * timeframe.in_seconds() // time change (in seconds)
+slope = delta_y / delta_x                        // price change per second
+
+// === Convert slope to angle (degrees) ===
+angle_rad = math.atan(slope * angle_scale)
+angle_deg = angle_rad * 180 / math.pi
+
+plot(angle_deg, "EMA Angle (°)", style=plot.style_columns, color=color.new(color.aqua, 20))
