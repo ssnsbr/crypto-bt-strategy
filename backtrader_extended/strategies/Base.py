@@ -205,6 +205,10 @@ class BaseTradingStrategy(bt.Strategy):
             self.portfolio_total_quantity = 0.0
             self.portfolio_avg_buy_price = 0.0
             self.portfolio_highest_price_since_buy = 0.0
+        self.update_targets()
+
+    def update_targets(self):
+        pass
 
     def _reset_strategy_state(self):
         if hasattr(self, 'sizer') and hasattr(self.sizer, 'reset'):

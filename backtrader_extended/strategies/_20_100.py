@@ -155,49 +155,6 @@ class _20_100_14x(BaseTradingStrategy):
             return
 
 
-class MartingaleSizer(bt.Sizer):
-    """
-    A position sizer that doubles the stake (position size) after each loss.
-    This is a classic Martingale strategy, increasing risk after losses.
-    """
-    params = (
-        ('stake_cash', 1000),  # Base cash amount for the initial position
-        ('multiplier', 2),
-        ('max_multiplier', 16),
-    )
-
-    def __init__(self):
-        self.loss_streak = 0
-        self.cash_to_buy = self.p.stake_cash
-
-    def notify_trade(self, trade):
-        """
-        Updates the loss streak and cash to buy based on the outcome of a closed trade.
-        """
-        if trade.isclosed:
-            if trade.pnl > 0:
-                self.loss_streak = 0
-                self.cash_to_buy = self.p.stake_cash
-            else:
-                self.loss_streak += 1
-                multiplier = min(self.p.multiplier ** self.loss_streak, self.p.max_multiplier)
-                self.cash_to_buy = self.p.stake_cash * multiplier
-
-    def _getsizing(self, comminfo, cash, data, isbuy):
-        """
-        Calculates the position size (in units) for the next trade based on the
-        cash amount to be spent and the current price.
-        """
-        if isbuy:
-            size = self.cash_to_buy / data.close[0]
-            # Ensure we don't try to buy more than available cash
-            if self.cash_to_buy > cash:
-                size = cash / data.close[0]
-            return size
-        else:  # Sell order
-            return self.getsizing(data)  # Close the entire position
-
-
 class MartingaleRiskManagement(AbstractRiskManagement):
     """
     Concrete base class for risk management, implementing common TP/SL/Emergency logic.

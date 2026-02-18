@@ -1,15 +1,21 @@
 class BounceDetector:
-    def __init__(self):
-        self.afterbuy = None
+    def __init__(self, up_bounce_threshold=1.1, down_bounce_threshold=0.9):
+        """
+        Args:
+            up_bounce_threshold: Multiplier for upward bounce (1.1 = +10%)
+            down_bounce_threshold: Multiplier for downward bounce (0.9 = -10%)
+        """
 
-    def detect_bounce(self, current_price, current_time=None, up_bounce_threshold=1.1, down_bounce_threshold=0.9):
+        self.afterbuy = None
+        self.down_bounce_threshold = down_bounce_threshold
+        self.up_bounce_threshold = up_bounce_threshold
+
+    def detect_bounce(self, current_price, current_time=None):
         """
         Detects meaningful bounces after the first buy.
 
         Args:
             current_price: Current price to evaluate
-            up_bounce_threshold: Multiplier for upward bounce (1.1 = +10%)
-            down_bounce_threshold: Multiplier for downward bounce (0.9 = -10%)
 
         Returns:
             dict: Current bounce state including bounce_list
@@ -57,7 +63,7 @@ class BounceDetector:
                 ab["extreme_time"] = current_time
 
             # Check for downward bounce (price drops by threshold from top)
-            elif current_price / ab["extreme"] <= down_bounce_threshold:
+            elif current_price / ab["extreme"] <= self.down_bounce_threshold:
                 # Record the completed UP bounce
                 prev_bottom = ab["bounce_list"][-1]["end"] if ab["bounce_list"] else ab["min"]
                 ab["bounce_list"].append({
@@ -79,7 +85,7 @@ class BounceDetector:
                 ab["extreme_time"] = current_time
 
             # Check for upward bounce (price rises by threshold from bottom)
-            elif current_price / ab["extreme"] >= up_bounce_threshold:
+            elif current_price / ab["extreme"] >= self.up_bounce_threshold:
                 # Record the completed DOWN bounce
                 prev_top = ab["bounce_list"][-1]["end"] if ab["bounce_list"] else ab["max"]
                 ab["bounce_list"].append({
@@ -109,13 +115,13 @@ class BounceDetector:
 def test_simple_up_bounce():
     """Test: Price goes down then bounces up 10%"""
     print("\n=== TEST 1: Simple Up Bounce ===")
-    detector = BounceDetector()
+    detector = BounceDetector(up_bounce_threshold=1.1, down_bounce_threshold=0.9)
 
     prices = [100, 95, 90, 85, 80, 88, 96, 105]  # Down to 80, then up to 105
     print(f"Price sequence: {prices}")
 
     for price in prices:
-        state = detector.detect_bounce(price, up_bounce_threshold=1.1, down_bounce_threshold=0.9)
+        state = detector.detect_bounce(price)
         direction = state['direction'] if state['direction'] else 'None'
         print(f"Price: {price:6.2f} | Direction: {direction:>5} | "
               f"Extreme: {state['extreme']:6.2f} | Bounces: {len(state['bounce_list'])}")
