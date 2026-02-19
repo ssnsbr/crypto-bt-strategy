@@ -6,6 +6,8 @@ from indicators.bounce_detector import BounceDetector
 from indicators.liveliness_tracker import LivelinessTracker
 import backtrader as bt
 
+from utils.utils import format_marketcap
+
 
 class MBS(BaseMBSUTILS):
 
@@ -30,9 +32,9 @@ class MBS(BaseMBSUTILS):
         #
         # ('use_indicator', [initial_buy, buy_again, sell_tp, sell_sl, sell_custom]),
         ('DEMA_p', 300),
-        ('use_dema_buy_sell', [False, False, False, False, False]),
+        ('use_dema', [False, False, False, False, False]),
         ('TEMA_p', 300),
-        ('use_tema_buy_sell', [False, False, False, False, False]),
+        ('use_tema', [False, False, False, False, False]),
         ('MACD_p', [12, 26, 9]),
         ('MACD_2X', [30, 65, 23]),
         ('MACD_5X', [60, 130, 45]),
@@ -51,10 +53,10 @@ class MBS(BaseMBSUTILS):
         ('use_stochastic', [False, False, False, False, False]),
         ('uncatch_bounce_tp', 1.2),
         ("sell_on_current_bounce_from_min", 1.5),
-        ("up_bounce_threshold", 1.1),
-        ("down_bounce_threshold", 0.9),
+        ("bounce_threshold", [1.3, 0.7]),
         ('use_bounce', [False, False, False, False, False]),
         ('use_down_fall', [False, False, False, False, False]),
+        ("buy_after_bounce_down", [-0.3, 1.1, "down"]),
     )
 
     def __init__(self):
@@ -75,9 +77,32 @@ class MBS(BaseMBSUTILS):
         self.min_wait_before_buy = 2
         self.min_wait_before_sell = 2
 
-        self.bounceDetector = BounceDetector(down_bounce_threshold=self.p.down_bounce_threshold, up_bounce_threshold=self.p.up_bounce_threshold)
+        self.bounceDetector = BounceDetector(up_bounce_threshold=self.p.bounce_threshold[0], down_bounce_threshold=self.p.bounce_threshold[1])
         self.bounce_state = None
         self.indicator_engine = IndicatorEngine(self)
+
+    def is_bounce_down(self):
+        state = self.bounceDetector.get_state()
+        if state is None:
+            return False
+        if len(state["bounce_list"]) < 2:
+            return False
+        # /\  down -0.5
+        #   \/ 0.1 up
+        last_bounce = state["bounce_list"][-1]
+        current_min = state["min"]
+        current_max = state["extreme"]
+        r = current_max / current_min
+        last_size_cond = last_bounce["gain"] < self.params.buy_after_bounce_down[0]
+        current_b_cond = r > self.params.buy_after_bounce_down[1]
+        last_type_cond = self.params.buy_after_bounce_down[2] == last_bounce["type"]
+        # print("r", r, f"= {format_marketcap(current_max)} / {format_marketcap(current_min) }", "last_bounce gain", last_bounce["gain"], "last_type", last_bounce["type"])
+        # print(last_type_cond, current_b_cond, last_size_cond)
+        # print(state)
+
+        if last_type_cond and current_b_cond and last_size_cond:
+            return True
+        return False
 
     def init_buy_cond(self):
         ib_cond = self.current_price > self.p.min_ib_mcap
@@ -131,12 +156,12 @@ class MBS(BaseMBSUTILS):
 
         # self.indicator_engine.update()
         # --- B1: Initial Buy ---
-        if self.init_buy_cond():
+        if self.init_buy_cond() and self.is_bounce_down():
             self.init_buy()
             return
 
         # --- B2: Averaging Down ---
-        if self.ba_cond():
+        if self.ba_cond() and self.is_bounce_down():
             self.order = self.again_buy()
             return
 
@@ -175,3 +200,9 @@ class MBS(BaseMBSUTILS):
             self.add_to_list("d")
             self.done = True
             return
+
+
+class After_MBS(MBS):
+    pass
+
+

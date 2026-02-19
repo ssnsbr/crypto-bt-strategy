@@ -4,6 +4,17 @@ import pandas as pd
 from backtrader_extended.strategies.Base_Crypto import BaseCryptoTradingStrategy
 
 
+# class BounceDetectorState:
+#     min
+#     min_time
+#     max
+#     max_time
+#     extreme
+#     extreme_time
+#     bounce_list
+#     direction = "up"
+
+
 class BounceDetector:
     def __init__(self):
         self.afterbuy = None

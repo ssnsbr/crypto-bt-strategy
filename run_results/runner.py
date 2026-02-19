@@ -341,3 +341,4 @@ def run_and_save(file_to_run, sizer_class, strategy_class, strategy_params, size
         print("\nDictionary successfully saved to ", portfolio_histories_save_path)
     except Exception as e:
         print(f"Error saving dictionary: {e}")
+    return all_results_df, all_cerebros_objects, all_portfolio_histories
