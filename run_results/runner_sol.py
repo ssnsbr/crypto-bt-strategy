@@ -7,10 +7,10 @@ import pandas as pd
 
 from run_results.analys_results import read_analysers
 from run_results.custom_analyzers import BACounterAnalyzer, CashHistoryAnalyzer, SafeVWR, TradeDurationAnalyzer
-from run_results.regime_analyser.regime_analyzer import RegimeAnalyzer
+# from run_results.regime_analyser.regime_analyzer import RegimeAnalyzer
 from run_results.runner_config import RunConfig
 from backtrader_extended.sizers.FiboMartingaleSizer import FiboMartingaleSizer
-from strategies import FiboMartingaleStrategy
+from backtrader_extended.strategies import FiboMartingaleStrategy
 from utils.utils import get_name
 import backtrader as bt
 
@@ -96,7 +96,7 @@ def _configure_cerebro(
     cerebro.addanalyzer(bt.analyzers.Calmar, _name='calmar')
     cerebro.addanalyzer(TradeDurationAnalyzer, _name='mytradeduration')
     cerebro.addanalyzer(BACounterAnalyzer, _name='mybacounteranalyzer')
-    cerebro.addanalyzer(RegimeAnalyzer, _name='regime')
+    # cerebro.addanalyzer(RegimeAnalyzer, _name='regime')
 
     # Add observers (for plotting later)
     cerebro.addobserver(bt.observers.Broker)

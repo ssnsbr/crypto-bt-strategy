@@ -1,0 +1,282 @@
+//@version=5
+strategy("PDMA / ma_b Strategy: Price from Last Touch",
+     overlay=false,
+     initial_capital=1000,
+     default_qty_type=strategy.percent_of_equity,
+     default_qty_value=10)
+startHour = input.int(0, "Start Hour", minval=0, maxval=23)
+endHour   = input.int(23, "End Hour", minval=0, maxval=23)
+// === DAY FILTER INPUTS ===
+tradeMon = input.bool(true,  "Monday")
+tradeTue = input.bool(true,  "Tuesday")
+tradeWed = input.bool(true,  "Wednesday")
+tradeThu = input.bool(true,  "Thursday")
+tradeFri = input.bool(true,  "Friday")
+tradeSat = input.bool(false, "Saturday")
+tradeSun = input.bool(false, "Sunday")
+
+// Current bar hour (exchange timezone)
+curHour = hour(time)
+// inSession = curHour >= startHour and curHour < endHour
+inHourSession  = startHour < endHour    ? curHour >= startHour and curHour < endHour    : curHour >= startHour or curHour < endHour
+curDay = dayofweek
+
+inDaySession =(curDay == dayofweek.monday    and tradeMon) or(curDay == dayofweek.tuesday   and tradeTue) or(curDay == dayofweek.wednesday and tradeWed) or(curDay == dayofweek.thursday  and tradeThu) or(curDay == dayofweek.friday    and tradeFri) or(curDay == dayofweek.saturday  and tradeSat) or(curDay == dayofweek.sunday    and tradeSun)
+
+inSession = inHourSession and inDaySession
+
+// === Inputs ===
+reverseSignal = input.bool(false, "reverseSignal")
+base_ma = input.int(50, "Base MA Length")
+maX2 = input.int(2, "MA X 2")
+maX3 = input.int(3, "MA X 3")
+maX4 = input.int(4, "MA X 4")
+maX5 = input.int(5, "MA X 5")
+smooth = input.int(23, "Smoothing Length")
+useTP = input.bool(true, "useTP")
+useSL = input.bool(true, "useSL")
+forceReverse = input.bool(true, "ForceReverse")
+forceReversethr = input.float(1, "ForceReverse")/100
+
+tpPerc = input.float(1, "TP %")/100
+slPerc = input.float(1.0, "SL %")/100
+useZvolume = input.bool(true, "Z Volume")
+useZtime = input.bool(true, "Z Time")
+useZprice = input.bool(false, "Z Price")
+useZtouch = input.bool(false, "Z Touch")
+normalizing = input.int(200, "normalizing")
+signaling = input.int(15, "signaling")
+
+// 60cc
+// 5
+// 5
+
+// === Lengths ===
+
+maLen1 = base_ma
+maLen2 = base_ma * maX2
+maLen3 = base_ma * maX3
+maLen4 = base_ma * maX4
+maLen5 = base_ma * maX5
+ema_src = hlc3
+
+ 
+dema(src, length) =>
+    e1 = ta.ema(src, length)
+    e2 = ta.ema(e1, length)
+    2 * e1 - e2
+tema(src, length) =>
+    e1 = ta.ema(src, length)
+    e2 = ta.ema(e1, length)
+    e3 = ta.ema(e2, length)
+    3 * e1 - 3 * e2 + e3
+
+// === MAs ===
+// ma1 = tema(ema_src, maLen1)
+// ma2 = tema(ema_src, maLen2)
+// ma3 = tema(ema_src, maLen3)
+// ma4 = tema(ema_src, maLen4)
+// ma5 = tema(ema_src, maLen5)
+
+ma1 = dema(ema_src, maLen1)
+ma2 = dema(ema_src, maLen2)
+ma3 = dema(ema_src, maLen3)
+ma4 = dema(ema_src, maLen4)
+ma5 = dema(ema_src, maLen5)
+
+// ma1 = ta.ema(ema_src, maLen1)
+// ma2 = ta.ema(ema_src, maLen2)
+// ma3 = ta.ema(ema_src, maLen3)
+// ma4 = ta.ema(ema_src, maLen4)
+// ma5 = ta.ema(ema_src, maLen5)
+
+// ma1 = ta.sma(ema_src, maLen1)
+// ma2 = ta.sma(ema_src, maLen2)
+// ma3 = ta.sma(ema_src, maLen3)
+// ma4 = ta.sma(ema_src, maLen4)
+// ma5 = ta.sma(ema_src, maLen5)
+
+// === Price at Last Touch ===
+var float touch_price1 = na
+var float touch_price2 = na
+var float touch_price3 = na
+var float touch_price4 = na
+var float touch_price5 = na
+
+// Update touch prices when cross occurs
+if ta.cross(close, ma1)
+    touch_price1 := close
+
+if ta.cross(close, ma2)
+    touch_price2 := close
+
+if ta.cross(close, ma3)
+    touch_price3 := close
+
+if ta.cross(close, ma4)
+    touch_price4 := close
+
+if ta.cross(close, ma5)
+    touch_price5 := close
+    
+// ==========================================
+// === Time Distance ===
+bars1 = ta.barssince(ta.cross(close, ma1)) // maLen1
+bars2 = ta.barssince(ta.cross(close, ma2)) // maLen2
+bars3 = ta.barssince(ta.cross(close, ma3)) // maLen3
+bars4 = ta.barssince(ta.cross(close, ma4)) // maLen4
+bars5 = ta.barssince(ta.cross(close, ma5)) // maLen5
+b = (bars1 + bars2 + bars3 + bars4 + bars5) / 5
+bz = (bars1*z1 + bars2*z2 + bars3*z3 + bars4*z4 + bars5*z5) / 5
+// ma_b = ta.ema(bz, smooth)
+series float  use_b = na
+
+if useZtime
+    use_b := bz
+else
+    use_b := b
+ma_b_smooth = ta.ema(use_b, smooth)
+ma_b = ma_b_smooth
+
+ma_b_mean = ta.sma(ma_b_smooth, normalizing)
+ma_b_stdev = ta.stdev(ma_b_smooth, normalizing)
+ma_b_norm = (ma_b_smooth - ma_b_mean) / ma_b_stdev
+// ================================================================
+// === Strategy Logic ===
+ma_pd_touch_signal = ta.ema(ma_pd_touch, signaling)
+ma_pd_touch_norm_signal = ta.ema(ma_pd_touch_norm, signaling)
+//
+ma_pd_signal = ta.ema(ma_pd_smooth, signaling)
+ma_pd_norm_signal = ta.ema(ma_pd_norm, signaling)
+//
+ma_b_norm_signal = ta.ema(ma_b_norm, signaling)
+ma_b_signal = ta.ema(ma_b, signaling)
+
+// Signal
+slope_ma_b_up = ma_b_norm > ma_b_norm_signal
+slope_ma_b_down = ma_b_norm < ma_b_norm_signal
+ 
+
+var bool exitsPlaced = false
+
+if strategy.position_size == 0
+    exitsPlaced := false
+
+if strategy.position_size > 0 and not exitsPlaced
+    ep = strategy.position_avg_price
+    strategy.exit(        "Long Exit",        "Long",        limit = useTP ? ep * (1 + tpPerc) : na,        stop  = useSL ? ep * (1 - slPerc) : na    )
+    exitsPlaced := true
+
+if strategy.position_size < 0 and not exitsPlaced
+    ep = strategy.position_avg_price
+    strategy.exit(        "Short Exit",        "Short",        limit = useTP ? ep * (1 - tpPerc) : na,        stop  = useSL ? ep * (1 + slPerc) : na    )
+    exitsPlaced := true
+
+// === Position Tracking ===
+var float entry_price = na
+var int entry_bar = na
+
+var bool longCond = false
+var bool shortCond = false
+
+if reverseSignal
+    longCond :=   slope_ma_b_down and ma_b_norm_signal > 0
+    shortCond := slope_ma_b_up  and  ma_b_norm_signal < 0
+else
+    longCond :=  slope_ma_b_up  and  ma_b_norm_signal < 0 
+    shortCond :=  slope_ma_b_down and ma_b_norm_signal > 0
+
+
+if strategy.position_size == 0
+    if longCond and  inSession
+        strategy.entry("Long", strategy.long)
+    else if shortCond and  inSession
+        strategy.entry("Short", strategy.short)
+
+// === FORCE REVERSE LOGIC ===
+if forceReverse
+    if longCond and strategy.position_size < 0
+        strategy.close("Short")
+        if inSession
+            strategy.entry("Long", strategy.long)
+
+    if shortCond and strategy.position_size > 0
+        strategy.close("Long")
+        if inSession
+            strategy.entry("Short", strategy.short)
+ // === Position change detection ===
+pos      = strategy.position_size
+posPrev = nz(strategy.position_size[1])
+
+longOpen   = pos > 0 and posPrev == 0
+shortOpen  = pos < 0 and posPrev == 0
+longClose  = pos == 0 and posPrev > 0
+shortClose = pos == 0 and posPrev < 0
+
+// === VISUALS (overlay=false) ===
+plotshape(longOpen,  title="Long Open",  text="OPEN L",
+     style=shape.triangleup,   location=location.bottom,
+     color=color.lime, textcolor=color.black, size=size.small)
+
+plotshape(shortOpen, title="Short Open", text="OPEN S",
+     style=shape.triangledown, location=location.top,
+     color=color.red, textcolor=color.white, size=size.small)
+
+plotshape(longClose,  title="Long Close",  text="CLOSE L",
+     style=shape.circle, location=location.bottom,
+     color=color.new(color.lime, 0), size=size.tiny)
+
+plotshape(shortClose, title="Short Close", text="CLOSE S",
+     style=shape.circle, location=location.top,
+     color=color.new(color.red, 0), size=size.tiny)
+
+openLongPlot  = longOpen  ?  1 : na
+openShortPlot = shortOpen ? -1 : na
+closePlot     = (longClose or shortClose) ? 0 : na
+
+plot(openLongPlot,  title="Long Open",  style=plot.style_cross, color=color.lime, linewidth=2)
+plot(openShortPlot, title="Short Open", style=plot.style_cross, color=color.red,  linewidth=2)
+plot(closePlot,     title="Close",      style=plot.style_circles, color=color.gray)
+
+
+
+// === Plot ===
+plot(ma_pd_norm_signal, "Price Signal", color=color.blue)
+plot(ma_pd_norm, "Price Distance from Touch", color=color.new(color.blue, 50))
+
+plot(ma_pd_touch_norm_signal, "Price Signal", color=color.green)
+plot(ma_pd_touch_norm, "Price Distance from Touch", color=color.new(color.green, 50))
+
+plot(ma_b_norm, "Time Since Touch", color=color.orange)
+plot(ma_b_norm_signal, "Time Signal", color=color.new(color.orange, 50))
+
+hline(0, "Zero Line", color=color.gray)
+hline(1, "Line", color=color.gray)
+hline(-1, "Line", color=color.gray)
+
+// differences
+d1 = ma_b_norm - ma_b_norm_signal
+d2 = ma_pd_touch_norm - ma_pd_touch_norm_signal
+d3 = ma_pd_norm - ma_pd_norm_signal
+
+// plot histograms
+plot(d1, style=plot.style_histogram, color=color.new(color.orange, 50))
+plot(d2, style=plot.style_histogram, color=color.new(color.green, 50))
+plot(d3, style=plot.style_histogram, color=color.new(color.blue, 50))
+
+
+
+
+
+// =========================================
+
+ma_dev = ta.stdev(close,100)
+maS = ta.sma(hlc3,5)
+// plot(close +(ma_pd_touch/ ma_b) * ma_dev, "Price MA + PD Signal", color=color.new(color.orange, 0))
+// plot(ma1 -(ma_pd_touch/ ma_b) * ma_dev, "Price MA - PD Signal", color=color.new(color.orange, 70))
+// plot(maS + ma_pd_touch_norm_signal, "Price MA - PD Signal", color=color.new(color.green, 10))
+// plot(maS + ma_b_norm_signal, "Price MA - PD Signal", color=color.new(color.orange, 10))
+// plot(maS + ma_pd_norm_signal, "Price MA - PD Signal", color=color.new(color.blue, 10))
+// plot(maS + vol_sum_norm_signal, "Price MA - PD Signal", color=color.new(color.yellow, 10))
+
+// plot( ma1, "Price MA + PD Signal", color=color.new(color.white, 0))

@@ -1,6 +1,6 @@
 import backtrader as bt
 
-from solana_backtrader_extended.strategies.pdma.mas import ZLEMA, SMMA
+from backtrader_extended.indicators.moving_averages import SMMA, ZLEMA
 
 
 class ImpulseMACD(bt.Indicator):

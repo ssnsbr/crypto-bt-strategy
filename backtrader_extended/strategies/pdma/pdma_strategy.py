@@ -1,11 +1,12 @@
 import backtrader as bt
 
-from solana_backtrader_extended.strategies.pdma.impulse_macd import ImpulseMACD
 
-from solana_backtrader_extended.strategies.pdma.price_distance import PriceDistanceFromMA
-from solana_backtrader_extended.strategies.pdma.price_touch_distance import PriceDistanceFromTouch
-from solana_backtrader_extended.strategies.pdma.time_distance import TimeDistance
-from solana_backtrader_extended.strategies.pdma.volume_distance import VolumeDistance
+from backtrader_extended.indicators.pdma.impulse_macd import ImpulseMACD
+from backtrader_extended.indicators.moving_averages import DEMA, TEMA, SMMA, ZLEMA, HullMA
+from backtrader_extended.indicators.pdma.price_distance import PriceDistanceFromMA
+from backtrader_extended.indicators.pdma.price_touch_distance import PriceDistanceFromTouch
+from backtrader_extended.indicators.pdma.time_distance import TimeDistance
+from backtrader_extended.indicators.pdma.volume_distance import VolumeDistance
 
 
 def _get_source(self, src_type):
@@ -75,18 +76,17 @@ class PDMAStrategy(bt.Strategy):
 
     def __init__(self):
         # Impulse MACD
-        self.impulse = ImpulseMACD(
-            self.data,
-            lengthMA=self.p.lengthMA,
-            lengthSignal=self.p.lengthSignal
-        )
-
+        self.mas = [
+            bt.indicators.EMA(self.p.src, period=self.p.ma_periods[0]),
+            bt.indicators.EMA(self.p.src, period=self.p.ma_periods[1]),
+            bt.indicators.EMA(self.p.src, period=self.p.ma_periods[2]),
+            bt.indicators.EMA(self.p.src, period=self.p.ma_periods[3]),
+            bt.indicators.EMA(self.p.src, period=self.p.ma_periods[4]),
+        ]
         # Price Distance from Touch
         self.price_touch = PriceDistanceFromTouch(
             self.data,
-            ma_types=self.p.ma_types,
-            ma_periods=self.p.ma_periods,
-            src=self.p.src,
+            mas=self.mas,
             smooth=self.p.smooth,
             useZ=self.p.useZtouch,
             normalize_len=self.p.normalize_len,
@@ -96,9 +96,7 @@ class PDMAStrategy(bt.Strategy):
         # Price Distance from MA
         self.price_dist = PriceDistanceFromMA(
             self.data,
-            ma_types=self.p.ma_types,
-            ma_periods=self.p.ma_periods,
-            src=self.p.src,
+            mas=self.mas,
             smooth=self.p.smooth,
             useZ=self.p.useZprice,
             normalize_len=self.p.normalize_len,
@@ -108,9 +106,7 @@ class PDMAStrategy(bt.Strategy):
         # Time Distance
         self.time_dist = TimeDistance(
             self.data,
-            ma_types=self.p.ma_types,
-            ma_periods=self.p.ma_periods,
-            src=self.p.src,
+            mas=self.mas,
             smooth=self.p.smooth,
             useZ=self.p.useZtime,
             normalize_len=self.p.normalize_len,

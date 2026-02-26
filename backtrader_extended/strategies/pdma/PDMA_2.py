@@ -1,7 +1,7 @@
 # BaseCryptoTradingStrategy
-        # super().__init__()
-        # self.risk_manager = NoneRiskManagement(self)
-    # def _execute_trading_logic(self):
+# super().__init__()
+# self.risk_manager = NoneRiskManagement(self)
+# def _execute_trading_logic(self):
 
 class PDMAStrategy(BaseTradingStrategy):
     """PDMA / ma_b Strategy: Price from Last Touch"""
@@ -133,10 +133,10 @@ class PDMAStrategy(BaseTradingStrategy):
         # Exit conditions
         # exitlongCond = correction_after_up
         # exitshortCond = correction_after_down
-        if self.current_price > self.portfolio_avg_buy_price * (1+self.p.tp):
+        if self.current_price > self.portfolio_avg_buy_price * (1 + self.p.tp):
             self.close()
             return
-        if  self.current_price < self.portfolio_avg_buy_price * (1-self.p.sl):
+        if self.current_price < self.portfolio_avg_buy_price * (1 - self.p.sl):
             self.close()
             return
 
@@ -151,7 +151,9 @@ class PDMAStrategy(BaseTradingStrategy):
                     self.close()
                     return
 
+
 st = PDMAStrategy
+
 
 @dataclass
 class RunConfig:
@@ -166,14 +168,14 @@ class RunConfig:
     min_start_margin: int = 10
     cerebro_runonce: bool = False
 
+
 config = RunConfig()
 #  6 400
 # 78910 400 900
 
-sp={
-    'dead_coin_market_cap': 9_000
-    , 'migration_market_cap': 100_000
- }
+sp = {
+    'dead_coin_market_cap': 9_000, 'migration_market_cap': 100_000
+}
 
 
 sp['data_in_market_cap'] = True
@@ -191,13 +193,10 @@ is_there_duplicate = False
 
 if not is_there_duplicate:
 
-
     strategy_class = PDMAStrategy
-    config.after_ath=  True
+    config.after_ath = True
 
     run_and_save(file_to_run=list_of_files_to_run,
-                sizer_class=sizer_class,
-                strategy_class=strategy_class,
-                strategy_params=sp
-                , sizer_params=zp
-                , config=config)
+                 sizer_class=sizer_class,
+                 strategy_class=strategy_class,
+                 strategy_params=sp, sizer_params=zp, config=config)

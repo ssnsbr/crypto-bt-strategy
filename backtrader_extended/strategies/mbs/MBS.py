@@ -53,7 +53,8 @@ class MBS(BaseMBSUTILS):
         ('use_stochastic', [False, False, False, False, False]),
         ('uncatch_bounce_tp', 1.2),
         ("sell_on_current_bounce_from_min", 1.5),
-        ("bounce_threshold", [1.3, 0.7]),
+        ("bounce_threshold_minor", [1.25, 0.75]),
+        ("bounce_threshold", [1.5, 0.5]),
         ('use_bounce', [False, False, False, False, False]),
         ('use_down_fall', [False, False, False, False, False]),
         ("buy_after_bounce_down", [-0.3, 1.1, "down"]),
@@ -77,6 +78,7 @@ class MBS(BaseMBSUTILS):
         self.min_wait_before_buy = 2
         self.min_wait_before_sell = 2
 
+        self.minorBounceDetector = BounceDetector(up_bounce_threshold=self.p.bounce_threshold_minor[0], down_bounce_threshold=self.p.bounce_threshold_minor[1])
         self.bounceDetector = BounceDetector(up_bounce_threshold=self.p.bounce_threshold[0], down_bounce_threshold=self.p.bounce_threshold[1])
         self.bounce_state = None
         self.indicator_engine = IndicatorEngine(self)
@@ -204,5 +206,3 @@ class MBS(BaseMBSUTILS):
 
 class After_MBS(MBS):
     pass
-
-

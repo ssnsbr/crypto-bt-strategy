@@ -1,3 +1,19 @@
+
+
+from dataclasses import dataclass
+
+
+@dataclass
+class Bounce:
+    index: int
+    time: int
+    type: str  # "up" "down"
+    price: float
+    start: float
+    end: float
+    gain: float
+
+
 class BounceDetector:
     def __init__(self, up_bounce_threshold=1.1, down_bounce_threshold=0.9):
         """

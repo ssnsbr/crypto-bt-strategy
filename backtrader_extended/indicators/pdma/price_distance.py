@@ -17,7 +17,8 @@ class PriceDistanceFromMASingle(bt.Indicator):
 
         if self.p.useZ:
             # Z value (position relative to MA): -1 if MA > close, else 1
-            z = bt.If(self.ma > self.data.close, -1, 1)
+            # z = bt.If(self.ma > self.data.close, -1, 1)
+            z = -1 if self.ma > self.data.close else 1
             self.lines.pd_raw = pd * z
         else:
             self.lines.pd_raw = pd

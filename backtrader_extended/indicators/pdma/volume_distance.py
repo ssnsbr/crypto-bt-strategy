@@ -1,5 +1,7 @@
 import backtrader as bt
 
+from backtrader_extended.indicators.moving_averages import DEMA, SMMA, ZLEMA, TEMA, HullMA
+
 
 class VolumeDistanceSingle(bt.Indicator):
     """Calculate volume distance for a single MA period"""
@@ -16,7 +18,8 @@ class VolumeDistanceSingle(bt.Indicator):
 
         if self.p.useZ:
             # Z value (position relative to MA): -1 if MA > close, else 1
-            z = bt.If(self.price_ma > self.data.close, -1, 1)
+            # z = bt.If(self.price_ma > self.data.close, -1, 1)
+            z = 1 if self.price_ma > self.data.close else -1
             self.lines.vol_weighted = self.vol_ma * z
         else:
             self.lines.vol_weighted = self.vol_ma
@@ -96,7 +99,7 @@ class VolumeDistance(bt.Indicator):
         elif ma_type == 'wma':
             return bt.indicators.WMA(src, period=period)
         elif ma_type == 'dema':
-            return DEMA(src, period=period)
+            return DEMA(src, period=period) 
         elif ma_type == 'tema':
             return TEMA(src, period=period)
         elif ma_type == 'hull':
