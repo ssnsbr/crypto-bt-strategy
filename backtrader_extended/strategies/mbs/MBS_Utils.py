@@ -1,7 +1,7 @@
 
 
 from backtrader_extended.strategies.Base import BaseTradingStrategy
-from riskmanagers.NoneRiskManagement import NoneRiskManagement
+from riskmanagers.noneRiskManagement import NoneRiskManagement
 
 
 class BaseMBSUTILS(BaseTradingStrategy):

@@ -1,6 +1,6 @@
 import backtrader as bt
 
-from riskmanagers.NoneRiskManagement import NoneRiskManagement
+from riskmanagers.noneRiskManagement import NoneRiskManagement
 
 
 class BaseCryptoTradingStrategy(bt.Strategy):

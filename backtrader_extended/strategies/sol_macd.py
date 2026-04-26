@@ -1,6 +1,6 @@
 import backtrader as bt
 from backtrader_extended.strategies.Base import BaseTradingStrategy
-from riskmanagers.NoneRiskManagement import NoneRiskManagement
+from riskmanagers.noneRiskManagement import NoneRiskManagement
 
 
 class SOL_EMA_MACD_Strategy(BaseTradingStrategy):

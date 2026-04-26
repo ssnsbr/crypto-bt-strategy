@@ -1,7 +1,7 @@
 
 
 from backtrader_extended.strategies.Base import BaseTradingStrategy
-from riskmanagers.NoneRiskManagement import NoneRiskManagement
+from riskmanagers.noneRiskManagement import NoneRiskManagement
 from indicators.bounce_detector import BounceDetector
 from indicators.liveliness_tracker import LivelinessTracker
 

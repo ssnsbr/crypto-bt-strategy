@@ -1,6 +1,6 @@
 
 from backtrader_extended.strategies.Base_Crypto import BaseCryptoTradingStrategy
-from riskmanagers.NoneRiskManagement import NoneRiskManagement
+from riskmanagers.noneRiskManagement import NoneRiskManagement
 import backtrader as bt
 
 
