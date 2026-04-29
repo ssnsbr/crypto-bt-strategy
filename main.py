@@ -62,7 +62,10 @@ if __name__ == "__main__":
     # strategy_class = FiboChecker
     # strategy_class = MAMACDStrategy
     # strategy_class = FiboR78Once
-    strategy_class = MBS
+    # strategy_class = MBS
+
+    from solana_strategies.pdma_mtf import MtfPDMAStrategy
+    strategy_class = MtfPDMAStrategy
     strategy_params = {'data_in_market_cap': mcap, "log": log}
     sizer_class = bt.sizers.FixedSize
 

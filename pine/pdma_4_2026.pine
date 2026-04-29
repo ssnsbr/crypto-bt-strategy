@@ -1,0 +1,740 @@
+//@version=5
+strategy("PDMA / ma_b Strategy: Price from Last Touch",
+     overlay=false,
+     initial_capital=1000,
+     default_qty_type=strategy.percent_of_equity,
+     default_qty_value=10)
+startHour = input.int(0, "Start Hour", minval=0, maxval=23)
+endHour   = input.int(23, "End Hour", minval=0, maxval=23)
+// === DAY FILTER INPUTS ===
+tradeMon = input.bool(true,  "Monday")
+tradeTue = input.bool(true,  "Tuesday")
+tradeWed = input.bool(true,  "Wednesday")
+tradeThu = input.bool(true,  "Thursday")
+tradeFri = input.bool(true,  "Friday")
+tradeSat = input.bool(false, "Saturday")
+tradeSun = input.bool(false, "Sunday")
+
+// Current bar hour (exchange timezone)
+curHour = hour(time)
+// inSession = curHour >= startHour and curHour < endHour
+inHourSession  = startHour < endHour    ? curHour >= startHour and curHour < endHour    : curHour >= startHour or curHour < endHour
+curDay = dayofweek
+
+inDaySession =(curDay == dayofweek.monday    and tradeMon) or(curDay == dayofweek.tuesday   and tradeTue) or(curDay == dayofweek.wednesday and tradeWed) or(curDay == dayofweek.thursday  and tradeThu) or(curDay == dayofweek.friday    and tradeFri) or(curDay == dayofweek.saturday  and tradeSat) or(curDay == dayofweek.sunday    and tradeSun)
+
+inSession = inHourSession and inDaySession
+
+// === Inputs ===
+reverseSignal = input.bool(false, "reverseSignal")
+base_ma = input.int(50, "Base MA Length")
+maX2 = input.float(2.0, "MA X 2")
+maX3 = input.float(3.0, "MA X 3")
+maX4 = input.float(4.0, "MA X 4")
+maX5 = input.float(5.1, "MA X 5")
+smooth = input.int(23, "Smoothing Length")
+useTP = input.bool(true, "useTP")
+useSL = input.bool(true, "useSL")
+forceReverse = input.bool(true, "ForceReverse")
+forceReversethr = input.float(1, "ForceReverse")/100
+
+tpPerc = input.float(1, "TP %")/100
+slPerc = input.float(1.0, "SL %")/100
+useZvolume = input.bool(true, "Z Volume")
+useZtime = input.bool(true, "Z Time")
+useZprice = input.bool(false, "Z Price")
+useZtouch = input.bool(false, "Z Touch")
+normalizing = input.int(200, "normalizing")
+signaling = input.int(15, "signaling")
+
+filter_ma_per = input.int(240, "Base MA Length")
+filter_open_by_ema = input.bool(true, "filter_open_by_ema")
+filter_close_by_ema = input.bool(false, "filter_close_by_ema")
+
+
+// 60cc
+// 5
+// 5
+
+// === Lengths ===
+
+maLen1 = base_ma
+maLen2 = int(base_ma * maX2)
+maLen3 = int(base_ma * maX3)
+maLen4 = int(base_ma * maX4)
+maLen5 = int(base_ma * maX5)
+ema_src = close
+
+ 
+dema(src, length) =>
+    e1 = ta.ema(src, length)
+    e2 = ta.ema(e1, length)
+    2 * e1 - e2
+tema(src, length) =>
+    e1 = ta.ema(src, length)
+    e2 = ta.ema(e1, length)
+    e3 = ta.ema(e2, length)
+    3 * e1 - 3 * e2 + e3
+
+// === MAs ===
+// ma1 = tema(ema_src, maLen1)
+// ma2 = tema(ema_src, maLen2)
+// ma3 = tema(ema_src, maLen3)
+// ma4 = tema(ema_src, maLen4)
+// ma5 = tema(ema_src, maLen5)
+filter_ma = ta.ema(close, filter_ma_per)
+
+ma1 = dema(ema_src, maLen1)
+ma2 = dema(ema_src, maLen2)
+ma3 = dema(ema_src, maLen3)
+ma4 = dema(ema_src, maLen4)
+ma5 = dema(ema_src, maLen5)
+
+// ma1 = ta.ema(ema_src, maLen1)
+// ma2 = ta.ema(ema_src, maLen2)
+// ma3 = ta.ema(ema_src, maLen3)
+// ma4 = ta.ema(ema_src, maLen4)
+// ma5 = ta.ema(ema_src, maLen5)
+
+// ma1 = ta.sma(ema_src, maLen1)
+// ma2 = ta.sma(ema_src, maLen2)
+// ma3 = ta.sma(ema_src, maLen3)
+// ma4 = ta.sma(ema_src, maLen4)
+// ma5 = ta.sma(ema_src, maLen5)
+
+// === Price at Last Touch ===
+var float touch_price1 = na
+var float touch_price2 = na
+var float touch_price3 = na
+var float touch_price4 = na
+var float touch_price5 = na
+
+// Update touch prices when cross occurs
+if ta.cross(close, ma1)
+    touch_price1 := close
+
+if ta.cross(close, ma2)
+    touch_price2 := close
+
+if ta.cross(close, ma3)
+    touch_price3 := close
+
+if ta.cross(close, ma4)
+    touch_price4 := close
+
+if ta.cross(close, ma5)
+    touch_price5 := close
+// ==========================================
+// === Price Distance from Last Touch (%) ===
+pd_touch1 = not na(touch_price1) ? (close - touch_price1) / touch_price1 * 100 : 0
+pd_touch2 = not na(touch_price2) ? (close - touch_price2) / touch_price2 * 100 : 0
+pd_touch3 = not na(touch_price3) ? (close - touch_price3) / touch_price3 * 100 : 0
+pd_touch4 = not na(touch_price4) ? (close - touch_price4) / touch_price4 * 100 : 0
+pd_touch5 = not na(touch_price5) ? (close - touch_price5) / touch_price5 * 100 : 0
+
+// Apply sign based on position relative to MA
+z1 = ma1 > close ? -1 : 1
+z2 = ma2 > close ? -1 : 1
+z3 = ma3 > close ? -1 : 1
+z4 = ma4 > close ? -1 : 1
+z5 = ma5 > close ? -1 : 1
+
+pd_touch1_abs = math.abs(pd_touch1) 
+pd_touch2_abs = math.abs(pd_touch2) 
+pd_touch3_abs = math.abs(pd_touch3) 
+pd_touch4_abs = math.abs(pd_touch4) 
+pd_touch5_abs = math.abs(pd_touch5) 
+
+a = (pd_touch1 + pd_touch2 + pd_touch3 + pd_touch4 + pd_touch5) / 5
+az = (pd_touch1* z1 + pd_touch2 * z2+ pd_touch3*z3 + pd_touch4*z4 + pd_touch5*z5) / 5
+
+// ma_pd_touch = ta.ema(a, smooth)
+
+// --- Normalize Price Distance ---
+series float  use_a = na
+if useZtouch
+    use_a := az
+else
+    use_a := a
+ma_pd_touch_smooth = ta.ema(use_a, smooth)
+ma_pd_touch = ma_pd_touch_smooth
+ma_pd_touch_mean = ta.sma(ma_pd_touch_smooth, normalizing)
+ma_pd_touch_stdev = ta.stdev(ma_pd_touch_smooth, normalizing)
+ma_pd_touch_norm = (ma_pd_touch_smooth - ma_pd_touch_mean) / ma_pd_touch_stdev
+// ==========================================
+// === Price Distance from MA (%) ===
+pd1 = (close - ma1)/ma1*100
+pd2 = (close - ma2)/ma2*100
+pd3 = (close - ma3)/ma3*100
+pd4 = (close - ma4)/ma4*100
+pd5 = (close - ma5)/ma5*100
+series float  use_c = na
+
+c = (pd1 + pd2 + pd3 + pd4 + pd5)/5
+cz= (pd1*z1 + pd2*z2 + pd3*z3 + pd4*z4 + pd5*z5)/5
+// cabs= (math.abs(pd1) + math.abs(pd2) + math.abs(pd3)+ math.abs(pd4) + math.abs(pd5))/5
+// cabsz= (math.abs(pd1)*z1 + math.abs(pd2)*z2 + math.abs(pd3)*z3+ math.abs(pd4)*z4 + math.abs(pd5)*z5)/5
+// cabsz is c
+// cabs is cz
+
+// --- Normalize Price Distance ---
+if useZprice
+    use_c := cz
+else
+    use_c := c
+ma_pd_smooth = ta.ema(use_c, smooth)
+ma_pd_mean = ta.sma(ma_pd_smooth, normalizing)
+ma_pd_stdev = ta.stdev(ma_pd_smooth, normalizing)
+ma_pd_norm = (ma_pd_smooth - ma_pd_mean) / ma_pd_stdev
+
+// ==========================================
+// === Time Distance ===
+bars1 = ta.barssince(ta.cross(close, ma1)) // maLen1
+bars2 = ta.barssince(ta.cross(close, ma2)) // maLen2
+bars3 = ta.barssince(ta.cross(close, ma3)) // maLen3
+bars4 = ta.barssince(ta.cross(close, ma4)) // maLen4
+bars5 = ta.barssince(ta.cross(close, ma5)) // maLen5
+b = (bars1 + bars2 + bars3 + bars4 + bars5) / 5
+bz = (bars1*z1 + bars2*z2 + bars3*z3 + bars4*z4 + bars5*z5) / 5
+// ma_b = ta.ema(bz, smooth)
+series float  use_b = na
+
+if useZtime
+    use_b := bz
+else
+    use_b := b
+ma_b_smooth = ta.ema(use_b, smooth)
+ma_b = ma_b_smooth
+
+ma_b_mean = ta.sma(ma_b_smooth, normalizing)
+ma_b_stdev = ta.stdev(ma_b_smooth, normalizing)
+ma_b_norm = (ma_b_smooth - ma_b_mean) / ma_b_stdev
+// ================================================================
+// === Strategy Logic ===
+ma_pd_touch_signal = ta.ema(ma_pd_touch, signaling)
+ma_pd_touch_norm_signal = ta.ema(ma_pd_touch_norm, signaling)
+//
+ma_pd_signal = ta.ema(ma_pd_smooth, signaling)
+ma_pd_norm_signal = ta.ema(ma_pd_norm, signaling)
+//
+ma_b_norm_signal = ta.ema(ma_b_norm, signaling)
+ma_b_signal = ta.ema(ma_b, signaling)
+
+// ================================================================
+
+// Add Volume
+volum_ma1 = ta.ema(volume, maLen1)
+volum_ma2 = ta.ema(volume, maLen2)
+volum_ma3 = ta.ema(volume, maLen3)
+volum_ma4 = ta.ema(volume, maLen4)
+volum_ma5 = ta.ema(volume, maLen5)
+series float  use_v = na
+v = (volum_ma1 + volum_ma2 + volum_ma3 + volum_ma4 + volum_ma5)/5
+vz = (volum_ma1*z1 + volum_ma2*z2 + volum_ma3*z3 + volum_ma4*z4 + volum_ma5*z5)/5
+if useZvolume
+    use_v := vz
+else
+    use_v := v
+vol_sum = ta.ema(use_v, smooth)
+// --- Normalize Volume  ---
+vol_sum_smooth = ta.ema(vol_sum, smooth)
+vol_sum_mean = ta.sma(vol_sum_smooth, normalizing)
+vol_sum_stdev = ta.stdev(vol_sum_smooth, normalizing)
+vol_sum_norm = (vol_sum_smooth - vol_sum_mean) / vol_sum_stdev
+vol_sum_norm_signal = ta.ema(vol_sum_norm, signaling)
+
+plot(vol_sum_norm, "Volume", color=color.yellow)
+plot(vol_sum_norm_signal, "Volume Signal", color=color.new(color.yellow, 50))
+
+// ================================================================
+// === Impulse MACD ===
+// fastMACD = ta.ema(close, 9)
+// slowMACD = ta.ema(close, 29)
+// macd = fastMACD - slowMACD
+// signal = ta.ema(macd, 9)
+// hist = macd - signal
+
+// // Impulse colors (green = up momentum, red = down momentum, blue = neutral)
+// impulse_up = hist > hist[1] and macd > signal
+// impulse_down = hist < hist[1] and macd < signal
+// impulse_neutral = not impulse_up and not impulse_down
+
+// plot(hist, "Impulse MACD", style=plot.style_columns, color=
+//      impulse_up ? color.green : impulse_down ? color.red : color.blue)
+
+// ================================================================
+
+// Diff Signal
+// using_ma_b = ma_b
+// using_ma_b_signal = ma_b_signal
+//
+//
+// using_ma_pd = ma_pd_touch
+// using_ma_pd_signal = ma_pd_touch_signal
+//
+// using_ma_pd = ma_pd_norm
+// using_ma_pd_signal = ma_pd_norm_signal
+// using_ma_pd = ma_pd
+// using_ma_pd_signal = ma_pd_signal
+// ================================================================
+// Signal
+slope_ma_pd_touch_up = ma_pd_touch_norm > ma_pd_touch_norm_signal
+slope_ma_pd_up = ma_pd_norm > ma_pd_norm_signal
+slope_ma_b_up = ma_b_norm > ma_b_norm_signal
+slope_ma_volume_up = vol_sum_norm > vol_sum_norm_signal
+
+slope_ma_volume_down = vol_sum_norm < vol_sum_norm_signal
+slope_ma_b_down = ma_b_norm < ma_b_norm_signal
+slope_ma_pd_down = not slope_ma_pd_up
+slope_ma_pd_touch_down = ma_pd_touch_norm < ma_pd_touch_norm_signal
+//
+price_downtrend = ma_pd_touch_norm < ma_pd_touch_norm_signal
+time_downtrend = ma_b_norm < ma_b_norm_signal
+
+all_slope_up = slope_ma_pd_touch_up and slope_ma_pd_up and slope_ma_b_up
+all_slope_down = slope_ma_pd_touch_down and slope_ma_pd_down and price_downtrend
+
+// Above
+slope_ma_b_above = ma_b_norm > 0
+slope_ma_pd_above = ma_pd_norm > 0
+slope_ma_pd_touch_above = ma_pd_touch_norm > 0
+v_above = vol_sum_norm > 0
+
+all_above = slope_ma_b_above and slope_ma_pd_touch_above and slope_ma_pd_above
+// Below
+slope_ma_b_below = ma_b_norm < 0
+slope_ma_pd_below = ma_pd_norm < 0
+slope_ma_pd_touch_below = ma_pd_touch_norm < 0
+v_below = vol_sum_norm < 0
+
+all_below = slope_ma_b_below and slope_ma_pd_touch_below and slope_ma_pd_below
+
+scoreuptrend = ma_b_norm > ma_pd_touch_norm ? 1 : 0
+scoredowntrend = ma_b_norm < ma_pd_touch_norm ? 1 : 0
+time_more_price = ma_b_norm_signal > ma_pd_touch_norm_signal
+price_more_time = ma_pd_touch_norm_signal > ma_b_norm_signal
+
+// SLOW
+slow_p_down = ma_pd_touch_norm_signal < 0
+slow_t_down = ma_b_norm_signal < 0
+
+slow_p_up = ma_pd_touch_norm_signal > 0
+slow_t_up = ma_b_norm_signal > 0
+
+slow_up = ma_pd_touch_norm_signal > 0 and ma_b_norm_signal > 0
+slow_down = ma_pd_touch_norm_signal < 0 and ma_b_norm_signal< 0
+
+// Corrections
+// correction_after_up = ma_b_norm > ma_pd_touch_norm or all_slope_down
+// correction_after_down = ma_b_norm < ma_pd_touch_norm or all_slope_up
+
+correction_after_up = ma_b_norm > ma_pd_touch_norm and all_slope_up
+correction_after_down = ma_b_norm < ma_pd_touch_norm and all_slope_down
+// correction_after_up = ma_b_norm > ma_pd_touch_norm and slope_ma_b_down and slope_ma_pd_touch_down
+// correction_after_down = ma_b_norm < ma_pd_touch_norm and slope_ma_b_up and slope_ma_pd_touch_up
+
+// ENTRY
+// longCond = slow_up and slope_ma_b_up and slope_ma_pd_touch_up and price_more_time
+// shortCond = slow_down and slope_ma_b_down and slope_ma_pd_touch_down and time_more_price
+// longCond = slow_up and slope_ma_b_up and slope_ma_pd_touch_up and price_more_time
+// shortCond = slow_down and slope_ma_b_down and slope_ma_pd_touch_down and time_more_price
+
+// longCond = all_above and all_slope_up and price_more_time  
+// shortCond = all_below and all_slope_down and time_more_price  
+
+// EXIT
+exitlongCond = correction_after_up
+exitshortCond = correction_after_down
+// if strategy.position_size > 0 
+//     ep = strategy.position_avg_price 
+//     long_tp = ep * (1 + tpPerc) 
+//     long_sl = ep * (1 - slPerc) 
+//     if useTP 
+//         strategy.exit("Long TP", "Long", limit=long_tp) 
+//     if useSL 
+//         strategy.exit("Long SL", "Long", stop=long_sl) 
+// if strategy.position_size < 0 
+//     ep = strategy.position_avg_price 
+//     short_sl = ep * (1 + slPerc)
+//     short_tp = ep * (1 - tpPerc) 
+//     if useTP 
+//         strategy.exit("Short TP", "Short", limit=short_tp) 
+//     if useSL 
+//         strategy.exit("Short SL", "Short", stop=short_sl)
+var bool exitsPlaced = false
+
+if strategy.position_size == 0
+    exitsPlaced := false
+
+if strategy.position_size > 0 and not exitsPlaced
+    ep = strategy.position_avg_price
+    strategy.exit(        "Long Exit",        "Long",        limit = useTP ? ep * (1 + tpPerc) : na,        stop  = useSL ? ep * (1 - slPerc) : na    )
+    exitsPlaced := true
+
+if strategy.position_size < 0 and not exitsPlaced
+    ep = strategy.position_avg_price
+    strategy.exit(        "Short Exit",        "Short",        limit = useTP ? ep * (1 - tpPerc) : na,        stop  = useSL ? ep * (1 + slPerc) : na    )
+    exitsPlaced := true
+
+// === Position Tracking ===
+var float entry_price = na
+var int entry_bar = na
+
+var bool longCond = false
+var bool shortCond = false
+
+var bool onlylong = false
+var bool onlyshort = false
+
+// up trend onlylong
+if filter_open_by_ema
+    onlylong := close > filter_ma
+    onlyshort := close < filter_ma
+
+if reverseSignal
+    longCond :=   slope_ma_b_down and ma_b_norm_signal > 0 
+    shortCond := slope_ma_b_up  and  ma_b_norm_signal < 0 
+else
+    longCond :=  slope_ma_b_up  and  ma_b_norm_signal < 0  
+    shortCond :=  slope_ma_b_down and ma_b_norm_signal > 0 
+
+// if strategy.position_size != 0 and na(entry_price)
+//     entry_price := strategy.position_avg_price
+//     entry_bar := bar_index
+
+// === Exit Logic ===
+// if exitlongCond
+//     if strategy.position_size > 0
+//         strategy.close("Long")
+
+// if exitshortCond
+//     if strategy.position_size < 0
+//         strategy.close("Short")
+// if longCond and strategy.position_size == 0
+//     strategy.entry("Long", strategy.long)
+
+// if shortCond and strategy.position_size == 0
+//     strategy.entry("Short", strategy.short)
+
+// ===========================================
+// ===========================================
+// 1m: wr: pf:
+// 3m: wr: pf:
+// 5m: wr: pf:
+// 15m: wr: pf:
+// ====================================
+// ============= Volume ===============
+// Volume SLope
+// longCond = slope_ma_volume_up  
+// shortCond = slope_ma_volume_down
+// ======Flip Logic=======
+// 1m: wr:40 pf:1.3
+// 3m: wr:51 pf:2.1
+// 5m: wr:51 pf:2.8
+// 15m: wr:39 pf:0.7
+// 0
+// Volume Above = Bad
+// longCond = v_below
+// shortCond =v_above
+// ======TP,SL = 1%========
+// 1m: wr:42 pf:0.9
+// 3m: wr:55 pf:1.55
+// 5m: wr:52 pf:1.23
+// 15m: wr:50 pf:1.07
+// <> 0
+// 1m: wr:49 pf:1.25
+// 3m: wr:51 pf:1.2
+// 5m: wr:50 pf:1.07
+// 15m: wr:48 pf:0.9
+// shortCond = v_below
+// longCond = v_above  
+// ====================================
+// =============== Time ===============
+// ======Flip Logic=======
+// Time only
+// 1m: wr:30 pf:1
+// 3m: wr:46 pf:1.5
+// 5m: wr:39 pf:1.7
+// 15m: wr:35 pf:0.8
+// longCond =   slope_ma_b_down
+// shortCond = slope_ma_b_up 
+// ==
+// Higher winrate with 1 ? pf
+// longCond =   slope_ma_b_down
+// shortCond =slope_ma_b_up 
+// ==
+// 1m: wr:32 pf:1.6
+// 3m: wr:35 pf:1.2
+// 5m: wr:31 pf:1.3
+// 15m: wr:34 pf:0.4
+// longCond =   slope_ma_b_above
+// shortCond = slope_ma_b_below
+// ==
+// Higher winrate with 1 > pf
+// longCond =   slope_ma_b_below
+// shortCond =slope_ma_b_above
+// ======TP,SL = 1%========
+// 1m: wr:62 pf:1.12
+// 3m: wr:51 pf:0.9
+// 5m: wr:49 pf:0.8
+// 15m: wr:50 pf:1
+// longCond =   slope_ma_b_down
+// shortCond = slope_ma_b_up 
+// == <> 0
+// 1m: wr:46 pf:1.37
+// 3m: wr:52 pf:1.2
+// 5m: wr:49 pf:1.04
+// 15m: wr:48 pf:0.9
+// Reversed:
+// longCond =   slope_ma_b_above
+// shortCond =  slope_ma_b_below 
+// ====================================
+// ============ Price Touch ===========
+// ======Flip Logic=======
+// 1m:32 wr: pf:0.8
+// 3m: wr:38 pf:1.83
+// 5m:41 wr: pf:1.86
+// 15m:35 wr: pf:1.01
+// longCond =   slope_ma_pd_touch_up
+// shortCond = slope_ma_pd_touch_down
+// ==
+// Higher winrate with 1 > pf
+// longCond =   slope_ma_pd_touch_down
+// shortCond = slope_ma_pd_touch_up
+// == > 0 
+// 1m: wr:30 pf:1.39
+// 3m: wr:42 pf:1.5
+// 5m: wr:47 pf:2
+// 15m: wr:32 pf:0.7
+// longCond = slope_ma_pd_touch_above  
+// shortCond = slope_ma_pd_touch_below
+// Higher winrate with 1 > pf
+// longCond =  slope_ma_pd_touch_below 
+// shortCond = slope_ma_pd_touch_above
+// ======TP,SL = 1%========
+// 1m: wr:32 pf:0.8
+// 3m: wr:48 pf:1.26
+// 5m: wr:47 pf:1.2
+// 15m: wr:48 pf:1
+// longCond =   slope_ma_pd_touch_up
+// shortCond = slope_ma_pd_touch_down
+// == <>0
+// 1m: wr:42 pf:1.2
+// 3m: wr:48 pf:1.1
+// 5m: wr:53 pf:1.27
+// 15m: wr:48 pf:0.94
+// longCond =   slope_ma_pd_touch_above
+// shortCond = slope_ma_pd_touch_below
+// ==============================
+// ============ Price ===========
+// ======Flip Logic=======
+// 1m: wr:31 pf:0.7
+// 3m: wr:36 pf:1.3
+// 5m: wr:38 pf:1.7
+// 15m: wr:36 pf:1.4
+// longCond =   slope_ma_pd_up
+// shortCond = slope_ma_pd_down
+// ===
+// 1m: wr:67 pf:1.3
+// other reverse
+// longCond =  slope_ma_pd_down 
+// shortCond = slope_ma_pd_up
+// >< 0
+// 1m: wr:30 pf:1.4
+// 3m: wr:40 pf:2.2
+// 5m: wr:32 pf:1.5
+// 15m:30 wr: pf:0.7
+// longCond =  slope_ma_pd_above
+// shortCond = slope_ma_pd_below
+// ======TP,SL = 1%========
+// 1m: wr:33 pf:0.8
+// 3m: wr:42 pf:1.3
+// 5m: wr:46 pf:1.2
+// 15m: wr:50 pf:1.1
+// longCond =   slope_ma_pd_up
+// shortCond = slope_ma_pd_down
+// == <> 0
+// 1m: wr:41 pf:1.2
+// 3m: wr:49 pf:1.28
+// 5m: wr:48 pf:1.25
+// 15m: wr:49 pf:0.9
+// longCond =  slope_ma_pd_above
+// shortCond = slope_ma_pd_below
+// ================================
+// ============ Combine ===========
+// Flip logic
+// 1m: wr:38 pf:1.56
+// 3m: wr:36 pf:1.38
+// 5m: wr:42 pf:1.2
+// 15m: wr:39 pf:0.7
+// longCond = slope_ma_b_up and slope_ma_pd_touch_above and v_above
+// shortCond = slope_ma_b_down and slope_ma_pd_touch_below and v_below
+// TP,SL = 1% (more trades)
+// 1m: wr:46 pf:1.19
+// 3m: wr:50 pf:1.15
+// 5m: wr:52 pf:1.15
+// 15m: wr:48 pf:0.9
+// ================================
+// Flip logic
+// 1m: too many
+// 3m: wr:24 pf:1.15
+// 5m: wr:25 pf:1.35
+// 15m: too many
+// shortCond  = slope_ma_pd_down or slope_ma_b_down
+// longCond = slope_ma_pd_up   or slope_ma_b_up
+
+// TP,SL = 1% (more trades)
+// 1m: too many trades
+// 3m: wr:26 pf:1.1
+// 5m: wr:27 pf:1.15
+// 15m too many trades
+// shortCond  = slope_ma_pd_down or slope_ma_b_down
+// longCond = slope_ma_pd_up   or slope_ma_b_up
+// ==================================
+// Flip logic
+// 1m: wr:32 pf:0.88
+// 3m: wr:41 pf:1.29
+// 5m: wr:41 pf:1.7
+// 15m: wr:39 pf:0.9
+// shortCond  = slope_ma_pd_down and slope_ma_b_down
+// longCond = slope_ma_pd_up   and slope_ma_b_up
+// TP,SL = 1% (more trades)
+// 1m: wr:35 pf:0.8
+// 3m: wr:49 pf:1.27
+// 5m: wr:52 pf:1.3
+// 15m: wr:52 pf:1.1
+// shortCond  = slope_ma_pd_down and slope_ma_b_down
+// longCond = slope_ma_pd_up   and slope_ma_b_up
+
+// longCond =   slope_ma_b_down
+// shortCond = slope_ma_b_up 
+
+// === Flip Logic ===
+// if longCond
+//     if strategy.position_size < 0 and forceReverse
+//         strategy.close("Short")
+//     if strategy.position_size == 0
+//         strategy.entry("Long", strategy.long)
+
+// if shortCond
+//     if strategy.position_size > 0 and forceReverse
+//         strategy.close("Long")
+//     if strategy.position_size == 0
+//         strategy.entry("Short", strategy.short)
+// === ENTRY LOGIC (FIXED) ===
+// if onlyshort and longCond
+//     longCond := false
+
+// if onlylong and shortCond
+//     shortCond := false
+
+
+if strategy.position_size == 0
+    if longCond and  inSession and not onlyshort
+        strategy.entry("Long", strategy.long)
+    else if shortCond and  inSession and not onlylong
+        strategy.entry("Short", strategy.short)
+
+// === FORCE REVERSE LOGIC ===
+if forceReverse
+    if longCond and strategy.position_size < 0
+        strategy.close("Short")
+        if longCond and inSession and not onlyshort
+            strategy.entry("Long", strategy.long)
+
+    if shortCond and strategy.position_size > 0
+        strategy.close("Long")
+        if shortCond and inSession and not onlylong
+            strategy.entry("Short", strategy.short)
+
+// ===== Fast Exit ======
+var bool fast_exit_long = false
+var bool fast_exit_short = false
+
+fast_exit_long := close < filter_ma
+fast_exit_short :=  close > filter_ma
+
+if filter_close_by_ema and strategy.position_size != 0  
+    if fast_exit_short and strategy.position_size < 0
+        strategy.close("Short")
+
+    if fast_exit_long and strategy.position_size > 0
+        strategy.close("Long")
+ 
+
+ // === Position change detection ===
+pos      = strategy.position_size
+posPrev = nz(strategy.position_size[1])
+
+longOpen   = pos > 0 and posPrev == 0
+shortOpen  = pos < 0 and posPrev == 0
+longClose  = pos == 0 and posPrev > 0
+shortClose = pos == 0 and posPrev < 0
+
+// === VISUALS (overlay=false) ===
+plotshape(longOpen,  title="Long Open",  text="OPEN L",
+     style=shape.triangleup,   location=location.bottom,
+     color=color.lime, textcolor=color.black, size=size.small)
+
+plotshape(shortOpen, title="Short Open", text="OPEN S",
+     style=shape.triangledown, location=location.top,
+     color=color.red, textcolor=color.white, size=size.small)
+
+plotshape(longClose,  title="Long Close",  text="CLOSE L",
+     style=shape.circle, location=location.bottom,
+     color=color.new(color.lime, 0), size=size.tiny)
+
+plotshape(shortClose, title="Short Close", text="CLOSE S",
+     style=shape.circle, location=location.top,
+     color=color.new(color.red, 0), size=size.tiny)
+
+openLongPlot  = longOpen  ?  1 : na
+openShortPlot = shortOpen ? -1 : na
+closePlot     = (longClose or shortClose) ? 0 : na
+
+plot(openLongPlot,  title="Long Open",  style=plot.style_cross, color=color.lime, linewidth=2)
+plot(openShortPlot, title="Short Open", style=plot.style_cross, color=color.red,  linewidth=2)
+plot(closePlot,     title="Close",      style=plot.style_circles, color=color.gray)
+
+
+
+// === Plot ===
+plot(ma_pd_norm_signal, "Price Signal", color=color.blue)
+plot(ma_pd_norm, "Price Distance from Touch", color=color.new(color.blue, 50))
+
+plot(ma_pd_touch_norm_signal, "Price Signal", color=color.green)
+plot(ma_pd_touch_norm, "Price Distance from Touch", color=color.new(color.green, 50))
+
+plot(ma_b_norm, "Time Since Touch", color=color.orange)
+plot(ma_b_norm_signal, "Time Signal", color=color.new(color.orange, 50))
+
+hline(0, "Zero Line", color=color.gray)
+hline(1, "Line", color=color.gray)
+hline(-1, "Line", color=color.gray)
+
+// differences
+d1 = ma_b_norm - ma_b_norm_signal
+d2 = ma_pd_touch_norm - ma_pd_touch_norm_signal
+d3 = ma_pd_norm - ma_pd_norm_signal
+
+// plot histograms
+plot(d1, style=plot.style_histogram, color=color.new(color.orange, 50))
+plot(d2, style=plot.style_histogram, color=color.new(color.green, 50))
+plot(d3, style=plot.style_histogram, color=color.new(color.blue, 50))
+
+
+
+
+
+// =========================================
+
+ma_dev = ta.stdev(close,100)
+maS = ta.sma(hlc3,5)
+// plot(close +(ma_pd_touch/ ma_b) * ma_dev, "Price MA + PD Signal", color=color.new(color.orange, 0))
+// plot(ma1 -(ma_pd_touch/ ma_b) * ma_dev, "Price MA - PD Signal", color=color.new(color.orange, 70))
+// plot(maS + ma_pd_touch_norm_signal, "Price MA - PD Signal", color=color.new(color.green, 10))
+// plot(maS + ma_b_norm_signal, "Price MA - PD Signal", color=color.new(color.orange, 10))
+// plot(maS + ma_pd_norm_signal, "Price MA - PD Signal", color=color.new(color.blue, 10))
+// plot(maS + vol_sum_norm_signal, "Price MA - PD Signal", color=color.new(color.yellow, 10))
+
+// plot( ma1, "Price MA + PD Signal", color=color.new(color.white, 0))

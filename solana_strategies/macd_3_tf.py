@@ -1,5 +1,7 @@
 import backtrader as bt
 
+from backtrader_extended.strategies.Base_Crypto import BaseCryptoTradingStrategy
+
 
 class SOL_MTF_MACD_Trend(BaseCryptoTradingStrategy):
     """

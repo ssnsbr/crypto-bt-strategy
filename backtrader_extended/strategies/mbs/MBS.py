@@ -2,11 +2,11 @@
 
 from backtrader_extended.strategies.mbs.MBS_Conditions import ActionType, IndicatorEngine
 from backtrader_extended.strategies.mbs.MBS_Utils import BaseMBSUTILS
-from indicators.bounce_detector import BounceDetector
-from indicators.liveliness_tracker import LivelinessTracker
+from raw_indicators.bounce_detector import BounceDetector
+from raw_indicators.liveliness_tracker import LivelinessTracker
 import backtrader as bt
 
-from utils.utils import format_marketcap
+# from utils.utils import format_marketcap
 
 
 class MBS(BaseMBSUTILS):

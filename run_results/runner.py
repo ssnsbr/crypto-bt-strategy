@@ -8,6 +8,7 @@ import os
 import backtrader as bt
 from backtrader_extended.commissions.CustomSolanaCommission import CustomSolanaCommission
 from backtrader_extended.strategies.FiboMartingaleStrategy import FiboMartingaleStrategy
+from my_logger import close_log, myprint, set_logging
 from run_results.analys_results import read_analysers
 from run_results.custom_analyzers import BACounterAnalyzer, CashHistoryAnalyzer, TradeDurationAnalyzer
 from run_results.runner_config import RunConfig
@@ -30,7 +31,7 @@ def _configure_cerebro(
     """
     Helper function to configure a Backtrader Cerebro object.
     """
-    print(f"[RUN] Strategy: {strategy_class.__name__}, Params: {strategy_params}")
+    myprint(f"[RUN] Strategy: {strategy_class.__name__}, Params: {strategy_params}")
     cerebro.addstrategy(strategy_class, **strategy_params)
 
     data = bt.feeds.PandasData(
@@ -47,21 +48,21 @@ def _configure_cerebro(
     cerebro.adddata(data)
 
     # REGISTER YOUR SIZER
-    print(f"[RUN] Sizer: {sizer_class.__name__}, Params: {sizer_params}")
+    myprint(f"[RUN] Sizer: {sizer_class.__name__}, Params: {sizer_params}")
     cerebro.addsizer(sizer_class, **sizer_params)
 
     if is_mcap:
         cerebro.broker.setcash(initial_cash * 1_000_000_000)
-        print(f"[RUN] In MCAP mode. Cash: {initial_cash}B, In-App Cash: {initial_cash * 1_000_000_000:.2f}")
+        myprint(f"[RUN] In MCAP mode. Cash: {initial_cash}B, In-App Cash: {initial_cash * 1_000_000_000:.2f}")
     else:
         cerebro.broker.setcash(initial_cash)
-        print(f"[RUN] Not in MCAP mode. Cash: {initial_cash:.2f}")
+        myprint(f"[RUN] Not in MCAP mode. Cash: {initial_cash:.2f}")
 
-    print(f"[RUN] Commission: {commission_class.__name__}")
+    myprint(f"[RUN] Commission: {commission_class.__name__}")
     cerebro.broker.addcommissioninfo(commission_class())
 
     # Add analyzers
-    print("[RUN] Adding Analyzers and Observers.")
+    myprint("[RUN] Adding Analyzers and Observers.")
     cerebro.addanalyzer(bt.analyzers.SharpeRatio, _name='mysharpe')
     cerebro.addanalyzer(bt.analyzers.DrawDown, _name='mydrawdown')
     cerebro.addanalyzer(bt.analyzers.TradeAnalyzer, _name='mytradeanalyzer')
@@ -130,11 +131,11 @@ def run_backtest_for_df(df, coin_name,
     )
 
     if mcap:
-        print(f'[RUN] Starting backtest for {coin_name} - Initial Portfolio Value: {cerebro.broker.getvalue()/1_000_000_000:.2f}')
+        myprint(f'[RUN] Starting backtest for {coin_name} - Initial Portfolio Value: {cerebro.broker.getvalue()/1_000_000_000:.2f}')
     else:
-        print(f'[RUN] Starting backtest for {coin_name} - Initial Portfolio Value: {cerebro.broker.getvalue():.2f}')
+        myprint(f'[RUN] Starting backtest for {coin_name} - Initial Portfolio Value: {cerebro.broker.getvalue():.2f}')
     if len(df) < 100:
-        print(f'[RUN] Not enough data for {coin_name}. Skipping backtest.')
+        myprint(f'[RUN] Not enough data for {coin_name}. Skipping backtest.')
         analysis_results = {
             'coin': coin_name,
             'start_value': cash,
@@ -143,12 +144,12 @@ def run_backtest_for_df(df, coin_name,
         return analysis_results, cerebro, []
     results = cerebro.run()
     strategy = results[0]
-    print("[RUN] Cerebro Ended.")
+    myprint("[RUN] Cerebro Ended.")
 
     final_portfolio_value = cerebro.broker.getvalue()
     if mcap:
         final_portfolio_value = final_portfolio_value / 1_000_000_000
-    print(f'[RUN] Final Portfolio Value for {coin_name}: {final_portfolio_value:.2f}')
+    myprint(f'[RUN] Final Portfolio Value for {coin_name}: {final_portfolio_value:.2f}')
     # Extract analysis results safely (with default fallbacks)
     # Extract analysis results
     analysis_results = {
@@ -159,9 +160,9 @@ def run_backtest_for_df(df, coin_name,
     a_r = read_analysers(strategy)
     analysis_results = analysis_results | a_r
 
-    print('Analyze:')
+    myprint('Analyze:')
     for k, v in analysis_results.items():
-        print("[RUN] ", k, v)
+        myprint("[RUN] ", k, v)
 
     # Extract portfolio history for plotting
     portfolio_history = {}
@@ -186,10 +187,10 @@ def run_backtest_for_df(df, coin_name,
         cash_history_series = cash_history_series / 1_000_000_000
 
     if print_cash_history:
-        print("[RUN] Cash History:", cash_history_series.tolist())
+        myprint("[RUN] Cash History:", cash_history_series.tolist())
         combined_array = np.column_stack((cash_history_series.values, portfolio_history_series.values))
         result_list_of_lists = combined_array.tolist()
-        print("[RUN] Full History:", result_list_of_lists)
+        myprint("[RUN] Full History:", result_list_of_lists)
 
     return analysis_results, cerebro, cash_history_series
 
@@ -201,9 +202,9 @@ def calculate_starting_index_time(df, after_ath=False, randomize=True, min_rando
     if after_ath:
         ath_index = df["close"].idxmax()
         ath = df["close"].max()
-        print("ATH is ", ath, " at index ", ath_index, " of ", len(df))
+        myprint("ATH is ", ath, " at index ", ath_index, " of ", len(df))
         df_to_run = df.loc[ath_index + 1:]
-        print("calculate_starting_index_time After ATH len:", len(df_to_run))
+        myprint("calculate_starting_index_time After ATH len:", len(df_to_run))
         starting_index = max(starting_index, ath_index)
 
     if min_start_minutes_to_wait != 0:
@@ -216,9 +217,9 @@ def calculate_starting_index_time(df, after_ath=False, randomize=True, min_rando
         if not later_rows.empty:
             starting_index = max(starting_index, later_rows.index[0])
             df_to_run = df[starting_index:]
-            print("calculate_starting_index_time After time_to_wait len:", len(df_to_run), " starting index:", starting_index, " Time of first row: ", df["date_time"].iloc[0], " Cutoff to Time: ", df_to_run["date_time"].iloc[0])
+            myprint("calculate_starting_index_time After time_to_wait len:", len(df_to_run), " starting index:", starting_index, " Time of first row: ", df["date_time"].iloc[0], " Cutoff to Time: ", df_to_run["date_time"].iloc[0])
         else:
-            print(f"calculate_starting_index_time No rows found {min_start_minutes_to_wait}h after start; using default index len(df)- ", min_len, len(df) - min_len, " Time of first row: ", df["date_time"].iloc[0], " Time of last row: ", df["date_time"].iloc[-1])
+            myprint(f"calculate_starting_index_time No rows found {min_start_minutes_to_wait}h after start; using default index len(df)- ", min_len, len(df) - min_len, " Time of first row: ", df["date_time"].iloc[0], " Time of last row: ", df["date_time"].iloc[-1])
 
             df_to_run = df[-min_len:]
             starting_index = max(starting_index, len(df) - min_len)
@@ -227,7 +228,7 @@ def calculate_starting_index_time(df, after_ath=False, randomize=True, min_rando
     if randomize:
         random_start_margin = randint(1, min(max_random_start_margin, len(df_to_run) - end_margin - 1))
         random_start_margin = max(min_random_start_margin, random_start_margin)
-        print("calculate_starting_index_time Randomized start margin:", random_start_margin, " => ", starting_index + random_start_margin)
+        myprint("calculate_starting_index_time Randomized start margin:", random_start_margin, " => ", starting_index + random_start_margin)
         return starting_index + random_start_margin
     return starting_index
 
@@ -254,7 +255,7 @@ def run_all(csv_files,
     all_portfolio_histories = {}
 
     for i, csv_file in enumerate(csv_files):
-        print(f"\n{'*' * 20} Running backtest for {os.path.basename(csv_file)} ({i+1}/{len(csv_files)}) {'*' * 20}")
+        myprint(f"\n{'*' * 20} Running backtest for {os.path.basename(csv_file)} ({i+1}/{len(csv_files)}) {'*' * 20}")
         df = pd.read_csv(csv_file)
         df = ready_df(df, mcap=config.mcap)
         coin_name = os.path.basename(csv_file).split('.')[0][17:27]  # Assuming coin name is the filename without extension
@@ -262,7 +263,7 @@ def run_all(csv_files,
         ath = df["close"].max()
 
         tmp_start_marg = calculate_starting_index_time(df, after_ath=config.after_ath, randomize=config.randomize_start_margin, min_random_start_margin=config.min_start_margin, max_random_start_margin=config.max_start_margin, end_margin=config.df_end_margin, min_start_minutes_to_wait=config.min_start_minutes_to_wait)
-        print("Start margin:", tmp_start_marg)
+        myprint("Start margin:", tmp_start_marg)
         analysis_result, cerebro_obj, portfolio_history_series = run_backtest_for_df(
             df[tmp_start_marg:config.df_end_margin],
             coin_name=coin_name,
@@ -301,7 +302,7 @@ def run_all(csv_files,
         #     all_cerebros[coin_name] = cerebro_obj
         #     all_portfolio_histories[coin_name] = portfolio_history_series
         # except Exception as e:
-        #     print(f"Error running backtest for {coin_name}: {e}")
+        #     myprint(f"Error running backtest for {coin_name}: {e}")
         #     # Optionally add a placeholder result for failed backtests
         #     all_results.append({'coin': coin_name, 'final_value': 'Error', 'sharpe_ratio': 'Error',
         #                         'max_drawdown': 'Error', 'total_trades': 'Error',
@@ -313,11 +314,18 @@ def run_all(csv_files,
 
 
 def run_and_save(file_to_run, sizer_class, strategy_class, strategy_params, sizer_params, config: RunConfig):
+    # Choose where the logs go
+    set_logging(
+        console=True,   # show on screen
+        file=True,      # also write to file
+        file_path=os.path.join(config.results_folder, "backtest.log")
+    )
+
     name, detail = get_name(strategy_class, strategy_params, sizer_class, sizer_params, len(file_to_run), config=config)
     results_folder = config.results_folder
     full_save_name = name + "_memes.csv"
     full_detail_name = "details_" + name + "_details.txt"
-    print(name, detail)
+    myprint(name, detail)
     all_results_df, all_cerebros_objects, all_portfolio_histories = run_all(file_to_run,
                                                                             sizer_class=sizer_class,
                                                                             strategy_class=strategy_class,
@@ -334,11 +342,12 @@ def run_and_save(file_to_run, sizer_class, strategy_class, strategy_params, size
 
     all_results_df.to_csv(df_save_path)
     portfolio_histories_save_path = results_folder + "all_portfolio_histories" + name
-    print("df saved to ", df_save_path)
+    myprint("df saved to ", df_save_path)
     try:
         with open(portfolio_histories_save_path, 'wb') as f:  # 'wb' for write binary
             pickle.dump(all_portfolio_histories, f)
-        print("\nDictionary successfully saved to ", portfolio_histories_save_path)
+        myprint("\nDictionary successfully saved to ", portfolio_histories_save_path)
     except Exception as e:
-        print(f"Error saving dictionary: {e}")
+        myprint(f"Error saving dictionary: {e}")
+    close_log()
     return all_results_df, all_cerebros_objects, all_portfolio_histories

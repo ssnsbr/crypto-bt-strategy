@@ -3,6 +3,33 @@ import backtrader as bt
 from riskmanagers.noneRiskManagement import NoneRiskManagement
 
 
+class DictDataFeed:
+    """Pretend to be a Backtrader data line for a single candle."""
+
+    def __init__(self, candle):
+        self.close = [candle["close"]]
+        self.high = [candle["high"]]
+        self.low = [candle["low"]]
+        self.open = [candle["open"]]
+        self.volume = [candle["volume"]]
+        self.datetime = [candle["timestamp"]]
+
+    def __getitem__(self, index):
+        # Allow indexing like data.close[0]
+        if index == 0:
+            return self.close[0]
+        raise IndexError
+
+    # Make .close[0] work
+    @property
+    def close(self):
+        return self._close
+
+    @close.setter
+    def close(self, val):
+        self._close = val
+
+
 class BaseCryptoTradingStrategy(bt.Strategy):
     """
     Base class for trading strategies, containing common parameters,
@@ -40,6 +67,8 @@ class BaseCryptoTradingStrategy(bt.Strategy):
         ('atr_period', 15),
         ('bb_period', 20),
         ('bb_devfactor', 2),
+
+        ('extra_timeframes', []),
     )
 
     def __init__(self):
@@ -86,8 +115,66 @@ class BaseCryptoTradingStrategy(bt.Strategy):
         self.current_marketcap_str = ""
         self.current_volume = 0  # Initialized for FastScalperStrategy
         self.print_risk_management_once = True
+
+        # --- Aggregation state for higher timeframes ---
+        self.extra_timeframes = self.params.extra_timeframes
+        self.tf_seconds = {}
+        self.agg_candles = {}      # tf -> current aggregated candle (dict)
+        self.prev_bucket = {}      # tf -> last bucket index
+        for tf in self.extra_timeframes:
+            minutes = int(tf.rstrip('m'))
+            self.tf_seconds[tf] = minutes * 60
+            self.agg_candles[tf] = None
+            self.prev_bucket[tf] = None
+
         print("Base Trading Strategy Initialized")
     # --- Utility Methods ---
+
+    def _update_aggregate(self, tf, row):
+        """
+        Update aggregated candle for timeframe tf.
+        Returns a finished candle as a dict (or None) when a bucket closes.
+        """
+        sec = self.tf_seconds[tf]
+        bucket = int(row["time"] // sec)
+
+        finished = None
+
+        # Bucket changed → finalize previous candle
+        if self.prev_bucket[tf] is not None and bucket != self.prev_bucket[tf]:
+            agg = self.agg_candles[tf]
+            if agg is not None:
+                # Return a dict – no Candle object
+                finished = {
+                    "open": agg["open"],
+                    "high": agg["high"],
+                    "low": agg["low"],
+                    "close": agg["close"],
+                    "volume": agg["volume"],
+                    "timestamp": agg["start_time"] + sec,   # close timestamp
+                    "timeframe": tf,
+                }
+
+        # Start new candle if bucket changed or first run
+        if self.prev_bucket[tf] != bucket:
+            start_time = bucket * sec
+            self.agg_candles[tf] = {
+                "open": row["open"],
+                "high": row["high"],
+                "low": row["low"],
+                "close": row["close"],
+                "volume": row["volume"],
+                "start_time": start_time,
+            }
+        else:
+            agg = self.agg_candles[tf]
+            agg["high"] = max(agg["high"], row["high"])
+            agg["low"] = min(agg["low"], row["low"])
+            agg["close"] = row["close"]
+            agg["volume"] += row["volume"]
+
+        self.prev_bucket[tf] = bucket
+        return finished
 
     def log(self, txt, dt=None):
         if self.params.log:
